@@ -57,12 +57,27 @@ const meIcon = L.divIcon({
   iconAnchor: [9, 9],
 });
 
-function createLeafletEngine(el, { center, zoom }) {
+function createLeafletEngine(el, { center, zoom }, { onTileError } = {}) {
   const map = L.map(el, { center: [center.lat, center.lng], zoom });
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: "&copy; OpenStreetMap contributors",
   }).addTo(map);
+  // If the very first tile fails (offline, DNS/firewall block, ad-blocker),
+  // let the caller show a message — pins still work, only the base map is
+  // missing, and a blank-looking map with no explanation is confusing.
+  if (onTileError) {
+    let reported = false;
+    tiles.on("tileerror", () => {
+      if (!reported) {
+        reported = true;
+        onTileError();
+      }
+    });
+    tiles.on("tileload", () => {
+      reported = true; // at least one tile worked — stop watching
+    });
+  }
   const pinsLayer = L.layerGroup().addTo(map);
   let me = null;
   let circle = null;
@@ -233,8 +248,17 @@ async function createGoogleEngine(el, { center, zoom }) {
   };
 }
 
-/** Creates the map inside `el`. Uses Google only if a key is set (and works). */
-export async function createOrderMap(el, opts, { forceLeaflet = false } = {}) {
+/**
+ * Creates the map inside `el`. Uses Google only if a key is set (and works).
+ * `onTileError` (optional) fires once if the OpenStreetMap base tiles fail to
+ * load — the map is likely still usable (pins work either way), but the
+ * background will look blank/grey, which is otherwise unexplained.
+ */
+export async function createOrderMap(
+  el,
+  opts,
+  { forceLeaflet = false, onTileError } = {},
+) {
   if (!forceLeaflet && hasMapsKey()) {
     try {
       return await createGoogleEngine(el, opts);
@@ -242,5 +266,5 @@ export async function createOrderMap(el, opts, { forceLeaflet = false } = {}) {
       console.warn("Google Maps unavailable, using OpenStreetMap:", e);
     }
   }
-  return createLeafletEngine(el, opts);
+  return createLeafletEngine(el, opts, { onTileError });
 }

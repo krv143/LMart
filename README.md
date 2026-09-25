@@ -93,7 +93,10 @@ across every store, in one place:
   **Open in Maps** button (turn-by-turn directions), and an **Open order** button that goes to the existing
   grocery order admin page (`/adminGroceryOrderPage/:martId}`) for orders that have a `martId`.
 - Refreshes every 30 seconds. Uses the same map module as the delivery New Orders page
-  (`utils/orderMap.js` — OpenStreetMap by default, or Google Maps if `REACT_APP_GOOGLE_MAPS_API_KEY` is set).
+  (`utils/orderMap.js` — OpenStreetMap by default, or Google Maps if `REACT_APP_GOOGLE_MAPS_API_KEY` is set;
+  falls back to OpenStreetMap if that key is rejected, and shows a small warning plus a **Retry** button if
+  the map fails to load at all, or a note if the map background tiles specifically fail — pins still work
+  either way).
 - This page is **read-only** — no accept/assign/edit actions. Use the existing admin/vendor order pages for
   changes.
 

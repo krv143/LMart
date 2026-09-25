@@ -111,6 +111,7 @@ const DeliveryNewOrdersPage = () => {
   const [message, setMessage] = useState("");
   const [mapReady, setMapReady] = useState(false);
   const [forceLeaflet, setForceLeaflet] = useState(false);
+  const [tileError, setTileError] = useState(false);
   const [radiusKm, setRadiusKm] = useState(readRadius);
 
   const mapDivRef = useRef(null);
@@ -311,7 +312,12 @@ const DeliveryNewOrdersPage = () => {
     let cancelled = false;
     let engine = null;
     setMapReady(false);
-    createOrderMap(mapDivRef.current, { center: DEFAULT_CENTER, zoom: 12 }, { forceLeaflet })
+    setTileError(false);
+    createOrderMap(
+      mapDivRef.current,
+      { center: DEFAULT_CENTER, zoom: 12 },
+      { forceLeaflet, onTileError: () => setTileError(true) },
+    )
       .then((e) => {
         if (cancelled) {
           e.destroy();
@@ -526,6 +532,11 @@ const DeliveryNewOrdersPage = () => {
                 </button>
               </div>
             </div>
+            {tileError && (
+              <div className="px-3 py-1 small text-warning bg-white border-top">
+                Map background tiles failed to load — check your internet connection. Pins still work.
+              </div>
+            )}
             <div className="px-3 py-2 small bg-white">{mapCaption}</div>
           </div>
         )}

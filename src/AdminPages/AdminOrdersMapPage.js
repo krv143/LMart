@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import { hasValidCoords, directionsUrl, openExternal } from "../utils/maps";
+import { hasValidCoords, directionsUrl, openExternal, onMapsAuthFailure } from "../utils/maps";
 import { createOrderMap } from "../utils/orderMap";
 
 const API_BASE =
@@ -45,6 +45,10 @@ const AdminOrdersMapPage = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [mapReady, setMapReady] = useState(false);
+  const [forceLeaflet, setForceLeaflet] = useState(false);
+  const [mapError, setMapError] = useState("");
+  const [tileError, setTileError] = useState(false);
+  const [mapReloadKey, setMapReloadKey] = useState(0);
 
   const mapDivRef = useRef(null);
   const engineRef = useRef(null);
@@ -90,11 +94,24 @@ const AdminOrdersMapPage = () => {
   );
 
   // ---------- map ----------
+  // If a Google Maps key is set but rejected (invalid key, API not enabled,
+  // billing off), fall back to OpenStreetMap instead of a broken/blank map.
+  useEffect(() => {
+    onMapsAuthFailure(() => setForceLeaflet(true));
+  }, []);
+
   useEffect(() => {
     if (!mapDivRef.current) return undefined;
     let cancelled = false;
     let engine = null;
-    createOrderMap(mapDivRef.current, { center: DEFAULT_CENTER, zoom: 12 })
+    setMapReady(false);
+    setMapError("");
+    setTileError(false);
+    createOrderMap(
+      mapDivRef.current,
+      { center: DEFAULT_CENTER, zoom: 12 },
+      { forceLeaflet, onTileError: () => setTileError(true) },
+    )
       .then((e) => {
         if (cancelled) {
           e.destroy();
@@ -105,13 +122,16 @@ const AdminOrdersMapPage = () => {
         setMapReady(true);
         setTimeout(() => e.invalidate(), 0);
       })
-      .catch((err) => console.error("Map failed to load:", err));
+      .catch((err) => {
+        console.error("Map failed to load:", err);
+        if (!cancelled) setMapError("The map couldn't load. Check your internet connection and try Retry.");
+      });
     return () => {
       cancelled = true;
       if (engine) engine.destroy();
       engineRef.current = null;
     };
-  }, []);
+  }, [forceLeaflet, mapReloadKey]);
 
   const pins = useMemo(
     () =>
@@ -206,21 +226,51 @@ const AdminOrdersMapPage = () => {
 
         {/* MAP */}
         <div className="card border-0 shadow-sm mb-3" style={{ borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ position: "relative", isolation: "isolate" }}>
-            <div ref={mapDivRef} style={{ width: "100%", height: "60vh", minHeight: 320 }} />
-            <div style={{ position: "absolute", top: 10, right: 10, zIndex: 1100 }}>
-              <button className="btn btn-sm btn-light shadow-sm" onClick={showAllPins}>
-                Fit all pins
-              </button>
+          {mapError ? (
+            <div className="p-4 text-center text-muted">
+              {mapError}
+              <div className="mt-2">
+                <button
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => {
+                    // Clearing mapError first re-mounts the container div (so
+                    // the ref is set again) before the effect below re-runs.
+                    setMapError("");
+                    setMapReloadKey((k) => k + 1);
+                  }}
+                >
+                  Retry
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="px-3 py-2 small bg-white">
-            {shown.length === 0
-              ? loading
-                ? "Loading orders…"
-                : "No orders with a saved location match this filter."
-              : `${shown.length} order${shown.length === 1 ? "" : "s"} on the map · tap a pin for details`}
-          </div>
+          ) : (
+            <div style={{ position: "relative", isolation: "isolate" }}>
+              <div
+                key={`${forceLeaflet ? "leaflet" : "auto"}-${mapReloadKey}`}
+                ref={mapDivRef}
+                style={{ width: "100%", height: "60vh", minHeight: 320 }}
+              />
+              <div style={{ position: "absolute", top: 10, right: 10, zIndex: 1100 }}>
+                <button className="btn btn-sm btn-light shadow-sm" onClick={showAllPins}>
+                  Fit all pins
+                </button>
+              </div>
+            </div>
+          )}
+          {!mapError && tileError && (
+            <div className="px-3 py-1 small text-warning bg-white border-top">
+              Map background tiles failed to load — check your internet connection. Pins below still work.
+            </div>
+          )}
+          {!mapError && (
+            <div className="px-3 py-2 small bg-white">
+              {shown.length === 0
+                ? loading
+                  ? "Loading orders…"
+                  : "No orders with a saved location match this filter."
+                : `${shown.length} order${shown.length === 1 ? "" : "s"} on the map · tap a pin for details`}
+            </div>
+          )}
         </div>
 
         {/* SELECTED ORDER */}
