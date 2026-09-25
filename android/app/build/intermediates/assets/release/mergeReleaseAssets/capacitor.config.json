@@ -1,0 +1,17 @@
+{
+	"appId": "com.ShMJqnAZKkEl.natively",
+	"appName": "HandyMan",
+	"webDir": "build",
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 1500,
+			"launchAutoHide": true,
+			"backgroundColor": "#ffffff",
+			"showSpinner": false
+		}
+	},
+	"backgroundColor": "#ffffff",
+	"ios": {
+		"contentInset": "automatic"
+	}
+}
