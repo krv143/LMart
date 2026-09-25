@@ -5,7 +5,11 @@ import {useNavigate } from "react-router-dom";
 import HandyManCharacter from "../img/hm_char.png";
 import HandyManLogo from "../img/Hm_Logo 1.png";
 import { setLoginData } from "../utils/auth";
-import { isOtpBypassNumber, OTP_BYPASS_LANDING } from "../config/loginBypass";
+import {
+  isOtpBypassNumber,
+  OTP_BYPASS_LANDING,
+  otpBypassIsFixedPath,
+} from "../config/loginBypass";
 // import { appConfig } from "./config";
 
 const LoginPage = () => {
@@ -54,7 +58,11 @@ const handleOtpBypass = async () => {
     }
     localStorage.setItem("mobile", mobile);
     setLoginData(user.userId);
-    Navigate(`${OTP_BYPASS_LANDING}/${user.profileType || "customer"}/${user.userId}`);
+    Navigate(
+      otpBypassIsFixedPath
+        ? OTP_BYPASS_LANDING
+        : `${OTP_BYPASS_LANDING}/${user.profileType || "customer"}/${user.userId}`,
+    );
   } catch (err) {
     console.error("Sign-in failed:", err);
     setError("Could not sign in. Please try again later.");

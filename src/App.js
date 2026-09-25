@@ -61,6 +61,7 @@ import AdminLiveChat from "./AdminPages/AdminLiveChat.js";
 import DeliveryPartnerDashboard from "./DeliveryPartnerPages/DeliveryPartnerDashboard.js";
 import DeliveryOrderDetailsPage from "./DeliveryPartnerPages/DeliveryOrderDetailsPage.js";
 import DeliveryNewOrdersPage from "./DeliveryPartnerPages/DeliveryNewOrdersPage.js";
+import AdminOrdersMapPage from "./AdminPages/AdminOrdersMapPage.js";
 import AddressPage from "./CustomerPages/AddressPage.js";
 
 import SuperAdminDeliveryPartnersPage from "./SuperAdminPages/SuperAdminDeliveryPartnersPage.js";
@@ -160,6 +161,7 @@ function App() {
               path="/deliveryNewOrders/:userType/:userId"
               element={<DeliveryNewOrdersPage />}
             />
+            <Route path="/adminOrdersMap/Admin" element={<AdminOrdersMapPage />} />
             <Route
               path="/deliveryOrderDetails/:userType/:userId/:orderId"
               element={<DeliveryOrderDetailsPage />}

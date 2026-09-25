@@ -80,13 +80,31 @@ After **any** change to `src/`, run `npm run cap:sync` (or `npm run android` / `
 - **Payments:** the project has no in-app payment code (only an unused Razorpay script tag
   in `public/index.html`). If you add digital-goods payments later, Apple/Google billing rules apply.
 
+## 4c. Admin "All Orders — Map" page
+
+`AdminPages/AdminOrdersMapPage.js`, route **`/adminOrdersMap/Admin`** — a read-only map of every order,
+across every store, in one place:
+- Fetches `Mart/GetAllMartItems` (no vendor scoping — this is the whole-business view) and plots every
+  order that has a real latitude/longitude. Orders with no location (0,0 or missing) are counted but not
+  pinned or listed.
+- Pins are colored by status (red = Open, orange = In Progress, green = Delivered, grey = Cancelled, blue =
+  anything else), with a legend and a status filter above the map.
+- Tapping a pin opens a details panel: store, customer, address, who it's assigned to, total, date, an
+  **Open in Maps** button (turn-by-turn directions), and an **Open order** button that goes to the existing
+  grocery order admin page (`/adminGroceryOrderPage/:martId}`) for orders that have a `martId`.
+- Refreshes every 30 seconds. Uses the same map module as the delivery New Orders page
+  (`utils/orderMap.js` — OpenStreetMap by default, or Google Maps if `REACT_APP_GOOGLE_MAPS_API_KEY` is set).
+- This page is **read-only** — no accept/assign/edit actions. Use the existing admin/vendor order pages for
+  changes.
+
 ## 4b. Delivery "New Orders" map and OTP-free number
 
 **OTP-free sign-in.** `src/config/loginBypass.js` lists `9885803193`. Entering that number on the login
-screen skips the SMS/OTP step and opens `/deliveryNewOrders/...`. If the number is not registered it shows
-"not registered" (it never creates a new account). To turn this off, empty the list.
-*Anyone who knows the number can sign in as that user*, so use it only for a demo / Play-review /
-test account. The safer version is to make the backend accept a fixed OTP for that number.
+screen skips the SMS/OTP step and opens **`/adminOrdersMap/Admin`** (the new admin orders-map page below).
+To send a bypass number to a `:userType/:userId` route instead (like the delivery New Orders page used to),
+set `otpBypassIsFixedPath` to `false` in the same file. To turn the bypass off entirely, empty
+`OTP_BYPASS_NUMBERS`. *Anyone who knows the number can sign in as that user*, so use it only for a demo /
+Play-review / test account. The safer version is to make the backend accept a fixed OTP for that number.
 
 **New Orders page** (`DeliveryPartnerPages/DeliveryNewOrdersPage.js`, also reachable from the delivery
 dashboard button "New orders on map"):
@@ -100,8 +118,15 @@ dashboard button "New orders on map"):
   status *Open*, not yet assigned, not a pick-up, **and has a real latitude/longitude** (0,0 or missing is
   excluded — those never show up here at all, on the map or in the list). Sorted nearest first, with the
   distance shown.
+- **No matching partner record:** if the login can't be matched to any delivery-partner record, the page
+  doesn't fully block — it shows every vendor's orders (still only ones with a real latitude/longitude),
+  with a banner explaining why, so the map and list are still useful for testing or while the account is
+  being fixed. **Accepting an order is still blocked** in that case (and while pending approval, or with no
+  store assigned), with the same reason shown as the error.
 - **Distance selector:** 5 km / 10 km / All (default 10 km, remembered). The map zooms to that distance around
-  the partner, and only orders inside it are listed. Orders farther
+  the partner, and only orders inside it are listed. If everything is filtered out, the message now names the
+  closest matching order's actual distance ("closest one is 7.4 km away") — a quick way to tell "the data is
+  there but too far for this radius" from "there's genuinely nothing open right now". Tap **All** to see it. Orders farther
   away, or without a map location, are counted in a note under the list. If GPS is off, all orders are shown.
   "Near me" re-zooms to the circle; "Show all" fits every pin.
 - **My active deliveries** are found by the partner's user id or by name (as the vendor's assign page does).
@@ -139,7 +164,7 @@ circle and panel work; if Google fails to load, the page falls back to OpenStree
 | `AdminGroceryOrderPage`, `AdminOrderClose`, `VendorOrdersPage` | `doc.save()` → `savePdf()` |
 | `RaiseTicketActionView`, `utils/vendorStorage.js` | `saveAs()` → `saveBlob()` |
 | `DeliveryPartnerPaymentMethod` | `XLSX.writeFile()` → `saveWorkbook()` |
-| `DeliveryNewOrdersPage.js`, `utils/orderMap.js`, `utils/maps.js`, `config/loginBypass.js` (new), `LoginPage.js`, `App.js`, `DeliveryPartnerDashboard.js` | OTP-free number + New Orders map (section 4b). |
+| `AdminOrdersMapPage.js` (new), `DeliveryNewOrdersPage.js`, `utils/orderMap.js`, `utils/maps.js`, `config/loginBypass.js` (new), `LoginPage.js`, `App.js`, `DeliveryPartnerDashboard.js` | OTP-free number + New Orders map (section 4b). |
 | `src/App.js` | Android hardware Back button: closes the app on login/home, otherwise goes back one screen. The web "reload on back" trick is skipped inside the app. |
 | `src/utils/PushNotificationService.js` | Uses native local notifications inside the app, browser notifications on the web. |
 | `src/index.js` | Service worker only registers on the web. |

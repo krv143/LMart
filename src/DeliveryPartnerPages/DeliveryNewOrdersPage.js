@@ -120,18 +120,25 @@ const DeliveryNewOrdersPage = () => {
   const knownIdsRef = useRef(null);
 
   const vendorId = profile?.vendorId;
-  const profileOk = Boolean(profile) && !blockedReason;
-  const showMap = !blockedReason; // the map is shown straight away, before orders load
+  // The map (and the order list) are shown regardless of blockedReason — a
+  // login with no matching partner record, or one that's pending approval /
+  // has no store yet, can still browse every order that has a real map
+  // location; only *accepting* an order requires a real partner record in
+  // good standing (see handleAccept below).
+  const showMap = true;
 
   // ---------- data ----------
   const fetchOrders = useCallback(
     async ({ silent } = {}) => {
-      if (!vendorId) return [];
       const res = await axios.get(GET_ALL_MART_ITEMS);
       const all = toList(res.data?.data ?? res.data?.$values ?? res.data);
-      // GetAllMartItems returns every vendor's orders — keep only this
-      // partner's store.
-      const list = all.filter((o) => String(o.vendorId) === String(vendorId));
+      // GetAllMartItems returns every vendor's orders. Narrow to this
+      // partner's store when we know it; if no partner record was found
+      // (see blockedReason), show every vendor's orders instead of none —
+      // still only ones with a real latitude/longitude (filtered below).
+      const list = vendorId
+        ? all.filter((o) => String(o.vendorId) === String(vendorId))
+        : all;
       setOrders(list);
 
       const openIds = new Set(
@@ -193,7 +200,7 @@ const DeliveryNewOrdersPage = () => {
   }, [userId]);
 
   useEffect(() => {
-    if (!profileOk) return undefined;
+    if (loading) return undefined;
     const load = (silent) =>
       fetchOrders({ silent }).catch(() =>
         setError("Unable to load orders right now."),
@@ -201,7 +208,7 @@ const DeliveryNewOrdersPage = () => {
     load(true);
     const t = setInterval(() => load(false), POLL_MS);
     return () => clearInterval(t);
-  }, [profileOk, fetchOrders]);
+  }, [loading, fetchOrders]);
 
   // ---------- my location ----------
   const locate = useCallback(async () => {
@@ -274,6 +281,15 @@ const DeliveryNewOrdersPage = () => {
     [newOrders, radiusActive, radiusKm],
   );
   const hiddenCount = newOrders.length - shownOrders.length;
+  // The single closest matching order that the distance filter is hiding —
+  // shown to make it obvious *why* the list looks empty (too tight a radius,
+  // rather than no matching orders at all).
+  const nearestHiddenKm = hiddenCount > 0
+    ? newOrders.reduce(
+        (min, o) => (o._km != null && (min == null || o._km < min) ? o._km : min),
+        null,
+      )
+    : null;
 
   const chooseRadius = (km) => {
     setRadiusKm(km);
@@ -389,6 +405,10 @@ const DeliveryNewOrdersPage = () => {
   // ---------- actions ----------
   const handleAccept = async (order) => {
     if (acceptingId) return;
+    if (blockedReason) {
+      setError(`Can't accept orders: ${blockedReason}`);
+      return;
+    }
     setAcceptingId(order.id);
     setError("");
     setMessage("");
@@ -448,9 +468,11 @@ const DeliveryNewOrdersPage = () => {
   const pinnedNew = shownOrders.filter((o) => o._c).length;
   const mapCaption =
     pins.length === 0
-      ? `No orders to show${radiusActive ? ` within ${radiusKm} km` : ""} — showing an empty map${
-          myLoc ? " around you" : ""
-        }`
+      ? nearestHiddenKm != null
+        ? `No orders within ${radiusKm} km — the closest one is ${nearestHiddenKm.toFixed(1)} km away. Try “All” or a bigger distance.`
+        : `No orders to show${radiusActive ? ` within ${radiusKm} km` : ""} — showing an empty map${
+            myLoc ? " around you" : ""
+          }`
       : `${pinnedNew} order${pinnedNew === 1 ? "" : "s"} on the map · tap a pin to see the order`;
 
   // ---------- render ----------
@@ -473,7 +495,7 @@ const DeliveryNewOrdersPage = () => {
             {profile?.deliveryPartnerName ? `Hi, ${profile.deliveryPartnerName}` : "Delivery partner"}
           </div>
         </div>
-        {profileOk && (
+        {!loading && (
           <button
             className="btn btn-sm btn-light"
             onClick={() => fetchOrders().catch(() => setError("Unable to refresh."))}
@@ -564,7 +586,7 @@ const DeliveryNewOrdersPage = () => {
           </div>
         )}
 
-        {profileOk && (
+        {!loading && (
           <>
             {/* DISTANCE */}
             <div className="d-flex align-items-center flex-wrap gap-2 mb-2">
@@ -583,6 +605,12 @@ const DeliveryNewOrdersPage = () => {
               </div>
             </div>
 
+            {!profile && !error && (
+              <div className="alert alert-secondary py-2">
+                Viewing all stores' orders because this login has no delivery partner record. Orders can't
+                be accepted until that's fixed.
+              </div>
+            )}
             {error && <div className="alert alert-danger py-2">{error}</div>}
             {message && <div className="alert alert-success py-2">{message}</div>}
             {locDenied && (
@@ -642,7 +670,7 @@ const DeliveryNewOrdersPage = () => {
             {shownOrders.length === 0 && (
               <div className="card border-0 shadow-sm text-center p-4 text-muted" style={{ borderRadius: 14 }}>
                 {hiddenCount > 0
-                  ? `No orders within ${radiusKm} km right now.`
+                  ? `No orders within ${radiusKm} km right now — the closest one is ${nearestHiddenKm?.toFixed(1)} km away.`
                   : "No new orders right now. This page refreshes by itself."}
               </div>
             )}

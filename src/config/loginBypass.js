@@ -13,5 +13,9 @@ export const OTP_BYPASS_NUMBERS = ["9885803193"];
 export const isOtpBypassNumber = (mobile) =>
   OTP_BYPASS_NUMBERS.includes(String(mobile || "").trim());
 
-// Where a bypass number lands after sign-in. :userType and :userId are filled in.
-export const OTP_BYPASS_LANDING = "/deliveryNewOrders";
+// Where a bypass number lands after sign-in.
+// AdminOrdersMapPage needs no :userType/:userId, so it's a plain path;
+// any other bypass number would still go to :userType/:userId/deliveryNewOrders
+// (kept for reference — not currently used by any listed number).
+export const OTP_BYPASS_LANDING = "/adminOrdersMap/Admin";
+export const otpBypassIsFixedPath = true;
