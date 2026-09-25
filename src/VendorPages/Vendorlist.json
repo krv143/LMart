@@ -1,0 +1,80 @@
+{
+  "vendors": [
+    {
+      "vendorId": "VEND1001",
+      "storeName": "Krishna Store",
+      "status": "Approved",
+      "pinCodes": ["530048", "530041", "530045"],
+      "categories": [
+        {
+          "category": "Unbeatable Offers",
+          "products": [
+            {
+              "productId": "adee70c3-9013-455f-9650-5eb87ac8e41c",
+              "discount": 20,
+              "qty": 50
+            },
+            {
+              "productId": "92a1add8-1bc7-4593-b415-b4b5b3415661",
+              "discount": 16,
+              "qty": 30
+            }
+          ]
+        },
+        {
+          "category": "LMart Special",
+          "products": [
+            {
+              "productId": "751d36cc-c6f9-498d-9b7b-4bf721110d16",
+              "qty": 30,
+              "discount": 12
+            }
+          ]
+        },
+        {
+          "category": "Atta & Flours",
+          "products": [
+            {
+              "productId": "9dafe88e-2976-4d42-a724-c8cb55f7dbcf",
+              "qty": 30,
+              "discount": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "vendorId": "VEND1002",
+      "storeName": "Satya Stores",
+      "status": "Approved",
+      "pinCodes": ["530001", "530002", "530003", "530004"],
+      "categories": [
+        {
+          "category": "Instant Food, Chips & Namkeen",
+          "products": [
+            {
+              "productId": "7a483bca-328c-4269-b5c5-37efc067649b",
+              "discount": 20,
+              "qty": 50
+            },
+            {
+              "productId": "a9083a47-990a-4e85-8255-241846a870fd",
+              "discount": 16,
+              "qty": 30
+            }
+          ]
+        },
+        {
+          "category": "Biscuits & Chocolates",
+          "products": [
+            {
+              "productId": "89e040b4-5f41-4747-bb7c-3c96f16e2508",
+              "qty": 30,
+              "discount": 12
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
