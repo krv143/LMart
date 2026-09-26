@@ -10,7 +10,6 @@ import Footer from "../CommonPages/Footer.js";
 import { getLocalCashbackOffers } from "../utils/localCashbackOffers";
 import { CartStorage } from "../CommonPages/CartStorage";
 import { invalidateVendorProductsCache } from "../utils/vendorListStore";
-import { getUserLocation } from "../utils/getLocation";
 // import { appConfig } from "./config";
   
 const GET_VENDOR_PRODUCTS_URL =
@@ -220,18 +219,18 @@ const GroceryPaymentmethod = () => {
   const [offerTransaction, setOfferTransaction] = useState(null);
   const [cashbackRules, setCashbackRules] = useState(DEFAULT_CASHBACK_RULES);
   const [pincodeList, setPincodeList] = useState([]);
-const [pincodesLoading, setPincodesLoading] = useState(false);
-const [tempStateId, setTempStateId] = useState("");
-const [tempState, setTempState] = useState("");
+  const [pincodesLoading, setPincodesLoading] = useState(false);
+  const [tempStateId, setTempStateId] = useState("");
+  const [tempState, setTempState] = useState("");
 
-const [tempDistrictId, setTempDistrictId] = useState("");
-const [tempDistrict, setTempDistrict] = useState("");
+  const [tempDistrictId, setTempDistrictId] = useState("");
+  const [tempDistrict, setTempDistrict] = useState("");
 
-const [tempZipCode, setTempZipCode] = useState("");
+  const [tempZipCode, setTempZipCode] = useState("");
   // const readServerPoints = (record) => {
   // const raw =
-  // record?.referralPoints ??      
-  // record?.referralpoints ??      
+  // record?.referralPoints ??
+  // record?.referralpoints ??
   // record?.ReferralPoints ??
   // 0;
   // const n = Number(raw);
@@ -403,180 +402,179 @@ const [tempZipCode, setTempZipCode] = useState("");
   }, [groceryItemId]);
 
   const fetchCustomerData = useCallback(async () => {
-  try {
-    const response = await fetch(
-      `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/Address/GetAddressById/${userId}`
-    );
+    try {
+      const response = await fetch(
+        `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/Address/GetAddressById/${userId}`,
+      );
 
-    if (!response.ok) {
-      throw new Error("Failed to fetch customer profile data");
+      if (!response.ok) {
+        throw new Error("Failed to fetch customer profile data");
+      }
+
+      const data = await response.json();
+
+      console.log("Customer Address API Response:", data);
+
+      const apiAddresses = Array.isArray(data) ? data : [data];
+
+      const formattedAddresses = apiAddresses.map((addr) => ({
+        id: addr.id,
+        addressId: addr.addressId,
+        type: addr.isPrimaryAddress ? "primary" : "secondary",
+
+        address: addr.address || "",
+
+        state: addr.state || "",
+
+        stateId: addr.stateId ?? addr.StateId ?? "",
+
+        district: addr.district || "",
+
+        districtId: addr.districtId ?? addr.DistrictId ?? "",
+
+        zipCode: addr.zipCode || "",
+
+        emailAddress: addr.emailAddress || "",
+
+        mobileNumber: addr.mobileNumber || "",
+
+        fullName: addr.fullName || "",
+
+        walletAmount: addr.walletAmount,
+      }));
+
+      console.log("Formatted Addresses:", formattedAddresses);
+
+      setAddresses(formattedAddresses);
+
+      const primary =
+        formattedAddresses.find((addr) => addr.type === "primary") ||
+        formattedAddresses[0];
+
+      if (primary) {
+        // Existing values
+        setFullName(primary.fullName || "");
+        setMobileNumber(primary.mobileNumber || "");
+        setNewAddress(primary.address || "");
+
+        setState(primary.state || "");
+        setDistrict(primary.district || "");
+        setZipCode(primary.zipCode || "");
+
+        // Initialize temporary values from saved address
+        setTempStateId(primary.stateId || "");
+        setTempState(primary.state || "");
+
+        setTempDistrictId(primary.districtId || "");
+        setTempDistrict(primary.district || "");
+
+        setTempZipCode(primary.zipCode || "");
+        // Address data
+        setAddressData({
+          fullName: primary.fullName || "",
+          mobileNumber: primary.mobileNumber || "",
+          address: primary.address || "",
+          state: primary.state || "",
+          district: primary.district || "",
+          zipCode: primary.zipCode || "",
+          walletAmount: primary.walletAmount || "",
+        });
+        setGuestCustomerId(primary.id);
+        setEditingAddressId(primary.addressId);
+      }
+
+      const apiFullName = primary?.fullName ?? "";
+
+      if (!apiFullName || isGuestName(apiFullName)) {
+        setIsNewUser(true);
+      } else {
+        setIsNewUser(false);
+      }
+    } catch (error) {
+      console.error("Error fetching customer data:", error);
     }
-
-    const data = await response.json();
-
-    console.log("Customer Address API Response:", data);
-
-    const apiAddresses = Array.isArray(data) ? data : [data];
-
-    const formattedAddresses = apiAddresses.map((addr) => ({
-      id: addr.id,
-      addressId: addr.addressId,
-      type: addr.isPrimaryAddress ? "primary" : "secondary",
-
-      address: addr.address || "",
-
-      state: addr.state || "",
-
-      stateId: addr.stateId ?? addr.StateId ?? "",
-
-      district: addr.district || "",
-
-      districtId: addr.districtId ?? addr.DistrictId ?? "",
-
-      zipCode: addr.zipCode || "",
-
-      emailAddress: addr.emailAddress || "",
-
-      mobileNumber: addr.mobileNumber || "",
-
-      fullName: addr.fullName || "",
-
-      walletAmount: addr.walletAmount,
-    }));
-
-    console.log("Formatted Addresses:", formattedAddresses);
-
-    setAddresses(formattedAddresses);
-
-    const primary =
-      formattedAddresses.find((addr) => addr.type === "primary") ||
-      formattedAddresses[0];
-
-    if (primary) {
-      // Existing values
-      setFullName(primary.fullName || "");
-      setMobileNumber(primary.mobileNumber || "");
-      setNewAddress(primary.address || "");
-
-      setState(primary.state || "");
-setDistrict(primary.district || "");
-setZipCode(primary.zipCode || "");
-
-// Initialize temporary values from saved address
-setTempStateId(primary.stateId || "");
-setTempState(primary.state || "");
-
-setTempDistrictId(primary.districtId || "");
-setTempDistrict(primary.district || "");
-
-setTempZipCode(primary.zipCode || "");
-      // Address data
-      setAddressData({
-        fullName: primary.fullName || "",
-        mobileNumber: primary.mobileNumber || "",
-        address: primary.address || "",
-        state: primary.state || "",
-        district: primary.district || "",
-        zipCode: primary.zipCode || "",
-        walletAmount: primary.walletAmount || "",
-      });
-      setGuestCustomerId(primary.id );
-      setEditingAddressId(primary.addressId);
-    }
-
-    const apiFullName = primary?.fullName ?? "";
-
-    if (!apiFullName || isGuestName(apiFullName)) {
-      setIsNewUser(true);
-    } else {
-      setIsNewUser(false);
-    }
-  } catch (error) {
-    console.error("Error fetching customer data:", error);
-  }
-}, [userId]);
+  }, [userId]);
 
   useEffect(() => {
     fetchCustomerData();
   }, [fetchCustomerData]);
 
-// GET STATES
-useEffect(() => {
-  axios
-    .get(
-      "https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/MasterData/getStates"
-    )
-    .then((response) => {
-      const data = Array.isArray(response.data) ? response.data : [];
-      console.log("States API Response:", data);
-      setStateList(data);
-    })
-    .catch((error) => {
-      console.error("Error fetching states:", error);
-      setStateList([]);
-    });
-}, []);
+  // GET STATES
+  useEffect(() => {
+    axios
+      .get(
+        "https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/MasterData/getStates",
+      )
+      .then((response) => {
+        const data = Array.isArray(response.data) ? response.data : [];
+        console.log("States API Response:", data);
+        setStateList(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching states:", error);
+        setStateList([]);
+      });
+  }, []);
 
-// GET DISTRICTS WHEN TEMPORARY STATE CHANGES
-useEffect(() => {
-  // No state selected
-  if (!tempStateId) {
-    setDistrictList([]);
-    return;
-  }
-
-  console.log("Loading districts for StateId:", tempStateId);
-
-  axios
-    .get(
-      `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/MasterData/getDistricts/${tempStateId}`
-    )
-    .then((response) => {
-      const data = Array.isArray(response.data) ? response.data : [];
-
-      console.log("District API Response:", data);
-
-      setDistrictList(data);
-    })
-    .catch((error) => {
-      console.error("Error fetching districts:", error);
+  // GET DISTRICTS WHEN TEMPORARY STATE CHANGES
+  useEffect(() => {
+    // No state selected
+    if (!tempStateId) {
       setDistrictList([]);
-    });
-}, [tempStateId]);
+      return;
+    }
 
+    console.log("Loading districts for StateId:", tempStateId);
 
-// GET PINCODES WHEN TEMPORARY DISTRICT CHANGES
-useEffect(() => {
-  if (!tempDistrictId) {
-    setPincodeList([]);
-    setPincodesLoading(false);
-    return;
-  }
+    axios
+      .get(
+        `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/MasterData/getDistricts/${tempStateId}`,
+      )
+      .then((response) => {
+        const data = Array.isArray(response.data) ? response.data : [];
 
-  console.log("Loading pincodes for DistrictId:", tempDistrictId);
+        console.log("District API Response:", data);
 
-  setPincodesLoading(true);
-  setPincodeList([]);
+        setDistrictList(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching districts:", error);
+        setDistrictList([]);
+      });
+  }, [tempStateId]);
 
-  axios
-    .get(
-      `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/MasterData/getPincodes/${tempDistrictId}`
-    )
-    .then((response) => {
-      const data = Array.isArray(response.data) ? response.data : [];
-
-      console.log("Pincode API Response:", data);
-
-      setPincodeList(data);
-    })
-    .catch((error) => {
-      console.error("Error fetching pincodes:", error);
+  // GET PINCODES WHEN TEMPORARY DISTRICT CHANGES
+  useEffect(() => {
+    if (!tempDistrictId) {
       setPincodeList([]);
-    })
-    .finally(() => {
       setPincodesLoading(false);
-    });
-}, [tempDistrictId]);
+      return;
+    }
+
+    console.log("Loading pincodes for DistrictId:", tempDistrictId);
+
+    setPincodesLoading(true);
+    setPincodeList([]);
+
+    axios
+      .get(
+        `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/MasterData/getPincodes/${tempDistrictId}`,
+      )
+      .then((response) => {
+        const data = Array.isArray(response.data) ? response.data : [];
+
+        console.log("Pincode API Response:", data);
+
+        setPincodeList(data);
+      })
+      .catch((error) => {
+        console.error("Error fetching pincodes:", error);
+        setPincodeList([]);
+      })
+      .finally(() => {
+        setPincodesLoading(false);
+      });
+  }, [tempDistrictId]);
 
   useEffect(() => {
     const fetchOfferWalletAmount = async () => {
@@ -630,181 +628,196 @@ useEffect(() => {
   };
 
   const openAddAddress = () => {
-  setFullName("");
-  setMobileNumber("");
-  setNewAddress("");
-const primary = addresses.find((addr) => addr.type === "primary");
-  setMobileNumber(primary?.mobileNumber || "");
-  setFullName(primary?.fullName || "");
-  // Clear permanent values
-  setState(""); 
-  setDistrict("");
-  setZipCode("");
+    setFullName("");
+    setMobileNumber("");
+    setNewAddress("");
+    const primary = addresses.find((addr) => addr.type === "primary");
+    setMobileNumber(primary?.mobileNumber || "");
+    setFullName(primary?.fullName || "");
+    // Clear permanent values
+    setState("");
+    setDistrict("");
+    setZipCode("");
 
-  // Clear temporary values
-  setTempStateId("");
-  setTempState("");
-  setTempDistrictId("");
-  setTempDistrict("");
-  setTempZipCode("");
+    // Clear temporary values
+    setTempStateId("");
+    setTempState("");
+    setTempDistrictId("");
+    setTempDistrict("");
+    setTempZipCode("");
 
-  // Clear dependent lists
-  setDistrictList([]);
-  setPincodeList([]);
+    // Clear dependent lists
+    setDistrictList([]);
+    setPincodeList([]);
 
-  setIsEditing(false);
-  setShowModal(true);
-};
+    setIsEditing(false);
+    setShowModal(true);
+  };
 
   // Handle address editing
   const handleAddressEdit = async () => {
-  // Temporary values selected by the user
-  const finalState = tempState;
-  const finalStateId = tempStateId;
+    // Temporary values selected by the user
+    const finalState = tempState;
+    const finalStateId = tempStateId;
 
-  const finalDistrict = tempDistrict;
-  const finalDistrictId = tempDistrictId;
+    const finalDistrict = tempDistrict;
+    const finalDistrictId = tempDistrictId;
 
-  const finalZipCode = tempZipCode;
+    const finalZipCode = tempZipCode;
 
-  // Validate required fields
-  if (
-    !fullName?.trim() ||
-    !newAddress?.trim() ||
-    !finalState?.trim() ||
-    !finalDistrict?.trim() ||
-    !finalZipCode?.trim() ||
-    !mobileNumber?.trim()
-  ) {
-    alert("Please fill in all required fields.");
-    return;
-  }
- if (fullName.trim().toLowerCase() === "guest") {
+    // Validate required fields
+    if (
+      !fullName?.trim() ||
+      !newAddress?.trim() ||
+      !finalState?.trim() ||
+      !finalDistrict?.trim() ||
+      !finalZipCode?.trim() ||
+      !mobileNumber?.trim()
+    ) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+    if (fullName.trim().toLowerCase() === "guest") {
       alert("Please Change Your Full Name.");
       return;
     }
-  // Validate pincode
-  if (!/^\d{6}$/.test(finalZipCode)) {
-    alert("Pincode must be exactly 6 digits.");
-    return;
-  }
-
-  // Address object for local state
-  const updatedAddress = {
-    id: guestCustomerId,
-    addressId: editingAddressId,
-    fullName,
-    mobileNumber,
-    address: newAddress,
-    state: finalState,
-    stateId: finalStateId,
-    district: finalDistrict,
-    districtId: finalDistrictId,
-    zipCode: finalZipCode,
-  };
-      
-  // API payload
-  const payload3 = {
-    id: guestCustomerId,
-    profileType: "profileType",
-    addressId: editingAddressId,
-    isPrimaryAddress: true,
-
-    address: newAddress,
-
-    state: finalState,
-    district: finalDistrict,
-
-    StateId: finalStateId,
-    DistrictId: finalDistrictId,
-
-    zipCode: finalZipCode,
-
-    mobileNumber: mobileNumber,
-    emailAddress: "emailAddress",
-    userId: userId,
-    firstName: fullName,
-    lastName: "lastName",
-    fullName: fullName,
-    WalletAmount: "",
-  };
-
-  try {
-    // Save address to API
-    const response = await fetch(
-      `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/Customer/CustomerAddressEdit`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload3),
-      }
-    );
-
-    // IMPORTANT:
-    // fetch() uses response.ok, NOT response.data
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      console.error("Error Response:", errorText);
-
-      throw new Error("Failed to edit address.");
+    // Validate pincode
+    if (!/^\d{6}$/.test(finalZipCode)) {
+      alert("Pincode must be exactly 6 digits.");
+      return;
     }
 
-    // =====================================================
-    // API SUCCESS
-    // ONLY NOW bind temporary values to permanent state
-    // =====================================================
+    // Address object for local state
+    const updatedAddress = {
+      id: guestCustomerId,
+      addressId: editingAddressId,
+      fullName,
+      mobileNumber,
+      address: newAddress,
+      state: finalState,
+      stateId: finalStateId,
+      district: finalDistrict,
+      districtId: finalDistrictId,
+      zipCode: finalZipCode,
+    };
 
-    setState(finalState);
+    // API payload
+    const payload3 = {
+      id: guestCustomerId,
+      profileType: "profileType",
+      addressId: editingAddressId,
+      isPrimaryAddress: true,
 
-    setDistrict(finalDistrict);
+      address: newAddress,
 
-    setZipCode(finalZipCode);
+      state: finalState,
+      district: finalDistrict,
 
-    // Update address list locally
-    setAddresses((prev) =>
-      prev.map((addr) =>
-        addr.id === guestCustomerId
-          ? updatedAddress
-          : addr
-      )
-    );
+      StateId: finalStateId,
+      DistrictId: finalDistrictId,
 
-    // Update selected address data
-    setAddressData(updatedAddress);
+      zipCode: finalZipCode,
 
-    // Refresh data from API
-    await fetchCustomerData();
+      mobileNumber: mobileNumber,
+      emailAddress: "emailAddress",
+      userId: userId,
+      firstName: fullName,
+      lastName: "lastName",
+      fullName: fullName,
+      WalletAmount: "",
+    };
 
-    // Close modal
-    setShowModal(false);
-    setIsEditing(false);
-    setEditingAddressId(null);
+    try {
+      // Save address to API
+      const response = await fetch(
+        `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/Customer/CustomerAddressEdit`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload3),
+        },
+      );
 
-    // Reset form
-    resetAddressForm();
+      // IMPORTANT:
+      // fetch() uses response.ok, NOT response.data
+      if (!response.ok) {
+        const errorText = await response.text();
 
-    alert("Address Updated Successfully!");
+        console.error("Error Response:", errorText);
 
-  } catch (error) {
-    console.error("Error editing address:", error);
+        throw new Error("Failed to edit address.");
+      }
 
-    alert(
-      error.message ||
-      "Failed to edit address. Please try again later."
-    );
-  }
-};
+      // =====================================================
+      // API SUCCESS
+      // ONLY NOW bind temporary values to permanent state
+      // =====================================================
 
+      setState(finalState);
+
+      setDistrict(finalDistrict);
+
+      setZipCode(finalZipCode);
+
+      // Update address list locally
+      setAddresses((prev) =>
+        prev.map((addr) =>
+          addr.id === guestCustomerId ? updatedAddress : addr,
+        ),
+      );
+
+      // Update selected address data
+      setAddressData(updatedAddress);
+
+      // Refresh data from API
+      await fetchCustomerData();
+
+      // Close modal
+      setShowModal(false);
+      setIsEditing(false);
+      setEditingAddressId(null);
+
+      // Reset form
+      resetAddressForm();
+
+      alert("Address Updated Successfully!");
+    } catch (error) {
+      console.error("Error editing address:", error);
+
+      alert(error.message || "Failed to edit address. Please try again later.");
+    }
+  };
+
+  const getUserLocation = () => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject("Geolocation is not supported");
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          (error) => reject(error),
+        );
+      }
+    });
+  };
 
   console.log("Address:", primaryAddress);
 
-  const isAddressInvalid = !primaryAddress || !newAddress?.trim() || !state?.trim() || !district?.trim() || !zipCode?.trim();
-  
-  const isOrderDisabled =
-    isAddressInvalid || isFirstOrderMinNotReached;
+  const isAddressInvalid =
+    !primaryAddress ||
+    !newAddress?.trim() ||
+    !state?.trim() ||
+    !district?.trim() ||
+    !zipCode?.trim();
+
+  const isOrderDisabled = isAddressInvalid || isFirstOrderMinNotReached;
   useEffect(() => {
     if (isAddressInvalid) {
       setShouldBlink(true);
@@ -813,7 +826,6 @@ const primary = addresses.find((addr) => addr.type === "primary");
     }
   }, [isAddressInvalid]);
 
- 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     handleResize();
@@ -830,15 +842,7 @@ const primary = addresses.find((addr) => addr.type === "primary");
     const existingWallet = Number(offerWalletAmount || 0);
     const walletAfterUsage = existingWallet - walletToUse;
     const updatedWalletAmount = walletAfterUsage + cashback;
-    // Capture the customer's GPS position for this order. If the customer denies
-    // permission, GPS is off, or it times out, the order still goes through
-    // with 0,0 rather than failing.
-    let location = { latitude: 0, longitude: 0 };
-    try {
-      location = await getUserLocation();
-    } catch (error) {
-      console.warn("Could not capture location for order:", error);
-    }
+    const location = await getUserLocation();
     const payload = {
       ...cartData,
       customerName: addressData.fullName || fullName,
@@ -947,28 +951,7 @@ const primary = addresses.find((addr) => addr.type === "primary");
           `Current Wallet Balance: ₹${updatedWalletAmount}.\n` +
           `Delivery Time Intimated Shortly!. 🎉`,
       );
-// Save the vendor store associated with this successful order
-try {
-  const vendorSelection = JSON.parse(
-    localStorage.getItem("vendorGrocerySelection") || "null"
-  );
-
-  const orderedVendorId =
-    vendorSelection?.vendorId || vendorId;
-
-  if (orderedVendorId) {
-    localStorage.setItem(
-      "lastOrderedVendor",
-      JSON.stringify({
-        vendorId: orderedVendorId,
-        storeName: vendorSelection?.storeName || "",
-      })
-    );
-  }
-} catch (error) {
-  console.error("Error saving ordered vendor:", error);
-}
-      window.location.href = `/profilePage/${userType}/${userId}`;
+      window.location.href = `/deliveryTracking/${groceryItemId}`;
     } catch (error) {
       console.error("❌ Order placement error:", error);
       alert("Something went wrong while placing the order. Please try again.");
@@ -1219,12 +1202,10 @@ try {
   const handlePaymentAndSms = async () => {
     try {
       setLoading(true);
-      await Promise.all([
-        handleUpdateStockLeft(),
-        handleUpdateVendorProductQuantities(),
-        sendLmartsms(),
-        handleUpdatePaymentMethod(),
-      ]);
+       await handleUpdateStockLeft();
+       await handleUpdateVendorProductQuantities();
+        await sendLmartsms();
+        await handleUpdatePaymentMethod();
     } catch (error) {
       console.error(error);
     } finally {
@@ -1233,8 +1214,8 @@ try {
   };
 
   const hasState = Boolean(state?.trim());
-const hasDistrict = Boolean(district?.trim());
-const hasPincode = Boolean(zipCode?.trim());
+  const hasDistrict = Boolean(district?.trim());
+  const hasPincode = Boolean(zipCode?.trim());
 
   return (
     <div>
@@ -1346,7 +1327,7 @@ const hasPincode = Boolean(zipCode?.trim());
                     <Form.Label>
                       State <span className="req_star">*</span>
                     </Form.Label>
-                    {hasState ? (                   
+                    {hasState ? (
                       <Form.Control
                         type="text"
                         value={state}
@@ -1358,41 +1339,38 @@ const hasPincode = Boolean(zipCode?.trim());
                         }}
                       />
                     ) : (
-                     <Form.Select
-  value={tempStateId || ""}
-  onChange={(e) => {
-    const selectedId = e.target.value;
+                      <Form.Select
+                        value={tempStateId || ""}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
 
-    const selectedState = stateList.find(
-      (s) => String(s?.StateId) === String(selectedId)
-    );
+                          const selectedState = stateList.find(
+                            (s) => String(s?.StateId) === String(selectedId),
+                          );
 
-    setTempStateId(selectedId);
-    setTempState(selectedState?.StateName || "");
+                          setTempStateId(selectedId);
+                          setTempState(selectedState?.StateName || "");
 
-    // Reset dependent temporary values
-    setTempDistrictId("");
-    setTempDistrict("");
-    setTempZipCode("");
+                          // Reset dependent temporary values
+                          setTempDistrictId("");
+                          setTempDistrict("");
+                          setTempZipCode("");
 
-    // Clear old dependent lists
-    setDistrictList([]);
-    setPincodeList([]);
-  }}
->
-  <option value="">Select State</option>
+                          // Clear old dependent lists
+                          setDistrictList([]);
+                          setPincodeList([]);
+                        }}
+                      >
+                        <option value="">Select State</option>
 
-  {stateList
-    .filter((s) => s?.StateId && s?.StateName)
-    .map((s) => (
-      <option
-        key={s.StateId}
-        value={String(s.StateId)}
-      >
-        {s.StateName}
-      </option>
-    ))}
-</Form.Select>
+                        {stateList
+                          .filter((s) => s?.StateId && s?.StateName)
+                          .map((s) => (
+                            <option key={s.StateId} value={String(s.StateId)}>
+                              {s.StateName}
+                            </option>
+                          ))}
+                      </Form.Select>
                     )}
                   </Form.Group>
                   <Form.Group className="mb-3">
@@ -1400,7 +1378,7 @@ const hasPincode = Boolean(zipCode?.trim());
                       District <span className="req_star">*</span>
                     </Form.Label>
                     {hasDistrict ? (
-                     <Form.Control
+                      <Form.Control
                         type="text"
                         value={district}
                         readOnly
@@ -1411,39 +1389,39 @@ const hasPincode = Boolean(zipCode?.trim());
                         }}
                       />
                     ) : (
-                     <Form.Select
-  value={tempDistrictId || ""}
-  disabled={!tempStateId}
-  onChange={(e) => {
-    const selectedId = e.target.value;
+                      <Form.Select
+                        value={tempDistrictId || ""}
+                        disabled={!tempStateId}
+                        onChange={(e) => {
+                          const selectedId = e.target.value;
 
-    const selectedDistrict = districtList.find(
-      (d) => String(d?.districtId) === String(selectedId)
-    );
+                          const selectedDistrict = districtList.find(
+                            (d) => String(d?.districtId) === String(selectedId),
+                          );
 
-    setTempDistrictId(selectedId);
-    setTempDistrict(selectedDistrict?.districtName || "");
+                          setTempDistrictId(selectedId);
+                          setTempDistrict(selectedDistrict?.districtName || "");
 
-    // Reset pincode
-    setTempZipCode("");
-    setPincodeList([]);
-  }}
->
-  <option value="">
-    {!tempStateId
-      ? "Select State First"
-      : "Select District"}
-  </option>
+                          // Reset pincode
+                          setTempZipCode("");
+                          setPincodeList([]);
+                        }}
+                      >
+                        <option value="">
+                          {!tempStateId
+                            ? "Select State First"
+                            : "Select District"}
+                        </option>
 
-  {districtList.map((d) => (
-    <option
-      key={d.districtId}
-      value={String(d.districtId)}
-    >
-      {d.districtName}
-    </option>
-  ))}
-</Form.Select>
+                        {districtList.map((d) => (
+                          <option
+                            key={d.districtId}
+                            value={String(d.districtId)}
+                          >
+                            {d.districtName}
+                          </option>
+                        ))}
+                      </Form.Select>
                     )}
                   </Form.Group>
                   <Form.Group className="mb-3">
@@ -1451,7 +1429,7 @@ const hasPincode = Boolean(zipCode?.trim());
                       Pincode <span className="req_star">*</span>
                     </Form.Label>
                     {hasPincode ? (
-                       <Form.Control
+                      <Form.Control
                         type="text"
                         value={zipCode}
                         readOnly
@@ -1463,41 +1441,41 @@ const hasPincode = Boolean(zipCode?.trim());
                       />
                     ) : (
                       <Form.Select
-  value={tempZipCode || ""}
-  disabled={!tempDistrictId || pincodesLoading}
-  onChange={(e) => {
-    setTempZipCode(e.target.value);
-  }}
->
-  <option value="">
-    {pincodesLoading
-      ? "Loading Pincodes..."
-      : !tempDistrictId
-        ? "Select District First"
-        : "Select Pincode"}
-  </option>
+                        value={tempZipCode || ""}
+                        disabled={!tempDistrictId || pincodesLoading}
+                        onChange={(e) => {
+                          setTempZipCode(e.target.value);
+                        }}
+                      >
+                        <option value="">
+                          {pincodesLoading
+                            ? "Loading Pincodes..."
+                            : !tempDistrictId
+                              ? "Select District First"
+                              : "Select Pincode"}
+                        </option>
 
-  {pincodeList.map((pincode, index) => {
-    const value =
-      pincode?.pincode ??
-      pincode?.Pincode ??
-      pincode?.pinCode ??
-      pincode?.PinCode ??
-      pincode?.zipCode ??
-      pincode?.ZipCode ??
-      pincode?.code ??
-      pincode;
+                        {pincodeList.map((pincode, index) => {
+                          const value =
+                            pincode?.pincode ??
+                            pincode?.Pincode ??
+                            pincode?.pinCode ??
+                            pincode?.PinCode ??
+                            pincode?.zipCode ??
+                            pincode?.ZipCode ??
+                            pincode?.code ??
+                            pincode;
 
-    return (
-      <option
-        key={`${value}-${index}`}
-        value={String(value)}
-      >
-        {String(value)}
-      </option>
-    );
-  })}
-</Form.Select>
+                          return (
+                            <option
+                              key={`${value}-${index}`}
+                              value={String(value)}
+                            >
+                              {String(value)}
+                            </option>
+                          );
+                        })}
+                      </Form.Select>
                     )}
                   </Form.Group>
                   <Button
@@ -1547,9 +1525,9 @@ const hasPincode = Boolean(zipCode?.trim());
                     className={`text-white mx-1 ${
                       shouldBlink ? "blinking-button" : ""
                     }`}
-                   onClick={() => {
-                     setGuestCustomerId(address.id);
-                    setEditingAddressId(address.addressId);
+                    onClick={() => {
+                      setGuestCustomerId(address.id);
+                      setEditingAddressId(address.addressId);
                       console.log("=================================");
                       console.log("GET API Address Object:", address);
                       console.log("ID:", address.id);
@@ -1560,20 +1538,20 @@ const hasPincode = Boolean(zipCode?.trim());
                         openAddAddress();
                         return;
                       }
-                    setFullName(address.fullName || "");
-                    setMobileNumber(address.mobileNumber || "");
-                    setNewAddress(address.address || "");
-                    setTempStateId(address.stateId || "");
-                    setTempState(address.state || "");
-                    setTempDistrictId(address.districtId || "");
-                    setTempDistrict(address.district || "");
-                    setTempZipCode(address.zipCode || "");
-                    setState(address.state || "");
-                    setDistrict(address.district || "");
-                    setZipCode(address.zipCode || "");
-                    setIsEditing(true);
-                    setShowModal(true);
-                  }}
+                      setFullName(address.fullName || "");
+                      setMobileNumber(address.mobileNumber || "");
+                      setNewAddress(address.address || "");
+                      setTempStateId(address.stateId || "");
+                      setTempState(address.state || "");
+                      setTempDistrictId(address.districtId || "");
+                      setTempDistrict(address.district || "");
+                      setTempZipCode(address.zipCode || "");
+                      setState(address.state || "");
+                      setDistrict(address.district || "");
+                      setZipCode(address.zipCode || "");
+                      setIsEditing(true);
+                      setShowModal(true);
+                    }}
                   >
                     {address.address === "" ? "Add Address" : "Edit Address"}
                   </Button>
@@ -1858,8 +1836,8 @@ const hasPincode = Boolean(zipCode?.trim());
                 onClick={handlePaymentAndSms}
                 title={
                   isFirstOrderMinNotReached
-                        ? "Minimum order value ₹150 required on your first order to get ₹50 cashback."
-                        : ""
+                    ? "Minimum order value ₹150 required on your first order to get ₹50 cashback."
+                    : ""
                 }
               >
                 {loading ? "Confirming Order..." : "Order Now"}

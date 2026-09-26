@@ -4,12 +4,6 @@ import '../App.css';
 import {useNavigate } from "react-router-dom";
 import HandyManCharacter from "../img/hm_char.png";
 import HandyManLogo from "../img/Hm_Logo 1.png";
-import { setLoginData } from "../utils/auth";
-import {
-  isOtpBypassNumber,
-  OTP_BYPASS_LANDING,
-  otpBypassIsFixedPath,
-} from "../config/loginBypass";
 // import { appConfig } from "./config";
 
 const LoginPage = () => {
@@ -39,38 +33,6 @@ const LoginPage = () => {
     };
   }, []);
 
-// Numbers listed in config/loginBypass.js sign in without an OTP and go
-// straight to the delivery "New Orders" map page.
-const handleOtpBypass = async () => {
-  setSubmitted(true);
-  try {
-    const res = await fetch(
-      `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/UserOnBoarding/GuestUserVerificationByMobileNo?mobileNo=${mobile}`
-    );
-    if (res.status !== 200) {
-      setError("This mobile number is not registered.");
-      return;
-    }
-    const user = await res.json();
-    if (!user?.userId) {
-      setError("Could not sign in. Please try again.");
-      return;
-    }
-    localStorage.setItem("mobile", mobile);
-    setLoginData(user.userId);
-    Navigate(
-      otpBypassIsFixedPath
-        ? OTP_BYPASS_LANDING
-        : `${OTP_BYPASS_LANDING}/${user.profileType || "customer"}/${user.userId}`,
-    );
-  } catch (err) {
-    console.error("Sign-in failed:", err);
-    setError("Could not sign in. Please try again later.");
-  } finally {
-    setSubmitted(false);
-  }
-};
-
 const handleOTP = async (e) => {
   e.preventDefault();
   if (!mobile) {  
@@ -78,10 +40,6 @@ const handleOTP = async (e) => {
     return;
   }
   setError("");
-  if (isOtpBypassNumber(mobile)) {
-    await handleOtpBypass();
-    return;
-  }
   setSubmitted(true);
   const payload = {
     senderValue: mobile,

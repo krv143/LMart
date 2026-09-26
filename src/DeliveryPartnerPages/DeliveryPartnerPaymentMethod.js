@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import * as XLSX from "xlsx";
-import { saveWorkbook } from "../utils/nativeFile";
 
 const DeliveryPartnerPaymentDashboard = () => {
   const [martItems, setMartItems] = useState([]);
@@ -75,7 +74,7 @@ const DeliveryPartnerPaymentDashboard = () => {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Payment Report");
 
     // Download file
-    saveWorkbook(XLSX, workbook, `OrdersPaymentReport${filters.fromDate}.xlsx`);
+    XLSX.writeFile(workbook, `OrdersPaymentReport${filters.fromDate}.xlsx`);
   };
 
   const [filters, setFilters] = useState({

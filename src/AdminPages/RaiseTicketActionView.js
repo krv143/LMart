@@ -13,7 +13,7 @@ import ForwardIcon from "@mui/icons-material/Forward";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import "../App.css";
 import JSZip from "jszip";
-import { saveBlob } from "../utils/nativeFile";
+import { saveAs } from "file-saver";
 const RaiseActionView = () => {
   const Navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
@@ -142,7 +142,7 @@ const RaiseActionView = () => {
     // Generate ZIP and download
     try {
       const content = await zip.generateAsync({ type: "blob" });
-      saveBlob(content, "TicketAttachments.zip");
+      saveAs(content, "TicketAttachments.zip");
     } catch (error) {
       console.error("Error generating ZIP:", error);
       alert("Failed to download attachments. Please try again.");

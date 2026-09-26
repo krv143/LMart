@@ -2,7 +2,6 @@ import React, { useState, useEffect} from "react";
 import "../App.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { savePdf } from "../utils/nativeFile";
 import Footer from '../CommonPages/Footer.js';
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useNavigate, useParams } from "react-router-dom";
@@ -591,7 +590,7 @@ doc.setTextColor(200, 0, 0);
     currentY,
     { align: "center" }
   );
-    savePdf(doc, `Grocery_Order_${martId}.pdf`);
+    doc.save(`Grocery_Order_${martId}.pdf`);
 };
      
 // const fmtDate = (iso) => {

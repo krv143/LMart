@@ -1,6 +1,4 @@
-import React, { useEffect, useRef } from "react";
-import { Capacitor } from "@capacitor/core";
-import { App as CapacitorApp } from "@capacitor/app";
+import React, { useEffect } from "react";
 import "./App.css";
 import DialogHost from "./CommonPages/DialogSystem";
 import {
@@ -60,14 +58,10 @@ import AdminRegistrationNumbers from "./AdminPages/AdminRegisterationNumbers.js"
 import AdminLiveChat from "./AdminPages/AdminLiveChat.js";
 import DeliveryPartnerDashboard from "./DeliveryPartnerPages/DeliveryPartnerDashboard.js";
 import DeliveryOrderDetailsPage from "./DeliveryPartnerPages/DeliveryOrderDetailsPage.js";
-import DeliveryNewOrdersPage from "./DeliveryPartnerPages/DeliveryNewOrdersPage.js";
-import AdminOrdersMapPage from "./AdminPages/AdminOrdersMapPage.js";
 import AddressPage from "./CustomerPages/AddressPage.js";
-
+import LiveOrderTrackingPage from "./CustomerPages/LiveOrderTrackingPage";
 import SuperAdminDeliveryPartnersPage from "./SuperAdminPages/SuperAdminDeliveryPartnersPage.js";
-
 import SuperAdminOrdersPage from "./SuperAdminPages/SuperAdminOrdersPage.js";
-
 import AdminOrderClose from "./AdminPages/AdminOrderClose.js";
 // import OneRupeeGroceryItems from './OneRupeeGroceryItems.js';
 // import CustomerLocation from "./CustomerLocation.js";
@@ -86,37 +80,7 @@ const PreventBackNavigation = () => {
     }
   }, [navigate, location]);
 
-  // Android hardware back button (native app only). On the login / home
-  // screens it closes the app; everywhere else it goes back one screen.
-  const locationRef = useRef(location);
   useEffect(() => {
-    locationRef.current = location;
-  }, [location]);
-
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return undefined;
-    let handle = null;
-    let removed = false;
-    CapacitorApp.addListener("backButton", () => {
-      const path = locationRef.current.pathname;
-      const atRoot =
-        path === "/" || path === "/loginnew" || path.startsWith("/profilePage/");
-      if (atRoot) CapacitorApp.exitApp();
-      else navigate(-1);
-    }).then((h) => {
-      if (removed) h.remove();
-      else handle = h;
-    });
-    return () => {
-      removed = true;
-      if (handle) handle.remove();
-    };
-  }, [navigate]);
-
-  useEffect(() => {
-    // The web-only "reload on back" trick below would fight the native back
-    // handling above, so it is skipped inside the app.
-    if (Capacitor.isNativePlatform()) return undefined;
     const handlePopState = (event) => {
       event.preventDefault();
       window.location.reload();
@@ -140,6 +104,10 @@ function App() {
         <main>
           {/* className="mt-100" */}
           <Routes>
+          <Route
+              path="/deliveryTracking/:id"
+              element={<LiveOrderTrackingPage />}
+            />
             <Route
               path="/addressPage/:userType/:userId"
               element={<AddressPage />}
@@ -157,11 +125,6 @@ function App() {
               path="/deliveryPartnerDashboard/:userType/:userId"
               element={<DeliveryPartnerDashboard />}
             />
-            <Route
-              path="/deliveryNewOrders/:userType/:userId"
-              element={<DeliveryNewOrdersPage />}
-            />
-            <Route path="/adminOrdersMap/Admin" element={<AdminOrdersMapPage />} />
             <Route
               path="/deliveryOrderDetails/:userType/:userId/:orderId"
               element={<DeliveryOrderDetailsPage />}

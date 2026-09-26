@@ -7,15 +7,29 @@
  * public, and keep the account low-privilege. To switch the bypass off, empty
  * the list. The safer long-term fix is to accept a fixed OTP for the number on
  * the backend (see README).
+ *
+ * Each number maps to where it lands after sign-in, since different bypass
+ * numbers now go to different fixed pages (not every bypass account is a
+ * delivery partner).
  */
-export const OTP_BYPASS_NUMBERS = ["9885803193"];
+export const OTP_BYPASS_LANDINGS = {
+  "9885803193": "/adminOrdersMap/Admin",
+  "9248513524": "/adminOrdersMap/Admin",
+  "9885803197": "/superadmin/order-map",
+};
+
+export const OTP_BYPASS_NUMBERS = Object.keys(OTP_BYPASS_LANDINGS);
 
 export const isOtpBypassNumber = (mobile) =>
   OTP_BYPASS_NUMBERS.includes(String(mobile || "").trim());
 
-// Where a bypass number lands after sign-in.
-// AdminOrdersMapPage needs no :userType/:userId, so it's a plain path;
-// any other bypass number would still go to :userType/:userId/deliveryNewOrders
-// (kept for reference — not currently used by any listed number).
+// Returns the fixed path a bypass number lands on, or null if the number
+// isn't a bypass number (caller should fall back to the normal OTP flow).
+export const getOtpBypassLanding = (mobile) =>
+  OTP_BYPASS_LANDINGS[String(mobile || "").trim()] || null;
+
+// Kept so any existing call site importing the old single-path constant
+// doesn't break; new code should call getOtpBypassLanding(mobile) instead,
+// since the landing page now varies by number.
 export const OTP_BYPASS_LANDING = "/adminOrdersMap/Admin";
 export const otpBypassIsFixedPath = true;

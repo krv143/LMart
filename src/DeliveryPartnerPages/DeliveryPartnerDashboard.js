@@ -387,13 +387,6 @@ const DeliveryPartnerDashboard = () => {
         {/* APPROVED DASHBOARD */}
         {isRegistered && partnerStatus === "open" && (
           <>
-            <button
-              className="btn btn-danger w-100 mb-3"
-              style={{ borderRadius: "14px", fontWeight: 600 }}
-              onClick={() => navigate(`/deliveryNewOrders/${userType}/${userId}`)}
-            >
-              🗺️ New orders on map
-            </button>
             {/* STATS */}
                 <div
                 className="row mb-4"

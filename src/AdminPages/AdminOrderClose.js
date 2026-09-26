@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import "../App.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { savePdf } from "../utils/nativeFile";
 import Footer from "../CommonPages/Footer.js";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { useNavigate, useParams } from "react-router-dom";
@@ -654,7 +653,7 @@ const AdminOrderClose = () => {
       { align: "center" },
     );
 
-    savePdf(doc, `Invoice_${martId}.pdf`);
+    doc.save(`Invoice_${martId}.pdf`);
   };
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { saveBlob } from "./nativeFile";
+import { saveAs } from "file-saver";
 
 const VENDOR_PROFILES_KEY = "vendorProfiles";
 const VENDOR_INVENTORY_KEY = "vendorInventory";
@@ -259,7 +259,7 @@ export const exportVendorInventory = (inventory) => {
   const blob = new Blob([JSON.stringify(inventory, null, 2)], {
     type: "application/json;charset=utf-8",
   });
-  saveBlob(blob, "vendor_inventory.json");
+  saveAs(blob, "vendor_inventory.json");
 };
 
 export const getVendorIcon = (vendorName) => {

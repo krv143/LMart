@@ -70,6 +70,15 @@ const DeliveryOrderDetailsPage = () => {
     navigate(`/deliveryPartnerDashboard/${userType}/${userId}`);
   };
 
+  const startLiveTracking = () => {
+    navigate(`/deliveryTracking/${orderId}`, {
+      state: {
+        trackingMode: "partner",
+        returnTo: `/deliveryOrderDetails/${userType}/${userId}/${orderId}`,
+      },
+    });
+  };
+
   const handleDecline = async () => {
     if (!order) return;
     setSubmitting(true);
@@ -226,6 +235,17 @@ const DeliveryOrderDetailsPage = () => {
               .join(", ")}
           </p>
         </div>
+
+        {String(order.status || "").toLowerCase() === "in progress" && (
+          <button
+            type="button"
+            className="btn btn-primary mb-4"
+            style={{ padding: "12px 18px", borderRadius: 10, fontWeight: 700 }}
+            onClick={startLiveTracking}
+          >
+            Start live tracking
+          </button>
+        )}
 
         {/* Items */}
         <button

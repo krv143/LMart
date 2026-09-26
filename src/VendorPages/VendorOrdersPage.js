@@ -15,7 +15,6 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { savePdf } from "../utils/nativeFile";
 import ImageCache from "../utils/ImageCache";
 import { getImageFilename, imageValueToUrl } from "../utils/imageSource";
 
@@ -141,7 +140,7 @@ const downloadOrderPdf = (order, vendor, imageUrls = {}) => {
   doc.text(`Grand Total: Rs ${order.grandTotal ?? 0} /-`, marginX, afterTableY);
   doc.setFont(undefined, "normal");
 
-  savePdf(doc, `order-${orderIdLabel}.pdf`);
+  doc.save(`order-${orderIdLabel}.pdf`);
 };
 
 const VendorOrdersPage = () => {

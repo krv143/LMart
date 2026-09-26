@@ -19,7 +19,7 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import DeliveryDiningIcon from "@mui/icons-material/DeliveryDining";
 import PermIdentityIcon from "@mui/icons-material/PermIdentity";
 import { playNotificationSound } from "../CommonPages/notificationSound";
-import { speakAlert } from "../CommonPages/speechAlert";
+import { speakAlert, speakTeluguAlert } from "../CommonPages/speechAlert";
 import { useNavigate, useParams } from "react-router-dom";
 import Logo from "../img/Hm_Logo 1.png";
 import SearchIcon from "@mui/icons-material/Search";
@@ -2125,6 +2125,7 @@ const getVendorGradient = (name = "") => {
 
       const nextSeenMap = { ...seenMap };
       const updatedTickets = [];
+      const startedDeliveries = [];
 
       (Array.isArray(martTickets) ? martTickets : []).forEach((ticket) => {
         const ticketKey = String(ticket?.id || ticket?.martId || "").trim();
@@ -2141,6 +2142,15 @@ const getVendorGradient = (name = "") => {
         if (seenMap[ticketKey] !== signature) {
           nextSeenMap[ticketKey] = signature;
           updatedTickets.push(ticket);
+          const previousStatus = String(seenMap[ticketKey] || "")
+            .split("|")[0]
+            .toLowerCase();
+          if (
+            previousStatus !== "in progress" &&
+            String(ticket?.status || "").toLowerCase() === "in progress"
+          ) {
+            startedDeliveries.push(ticket);
+          }
         }
       });
 
@@ -2157,6 +2167,13 @@ const getVendorGradient = (name = "") => {
         if (PushNotificationService.isEnabled()) {
           PushNotificationService.show("Handyman Order Update", message);
         }
+      }
+
+      if (startedDeliveries.length > 0) {
+        const startedOrder = startedDeliveries[startedDeliveries.length - 1];
+        speakTeluguAlert(
+          `మీ ఆర్డర్ ${startedOrder?.martId || ""} డెలివరీ కోసం బయలుదేరింది. ట్రాక్ చేయడానికి ట్రాక్ డెలివరీ బటన్ నొక్కండి.`,
+        );
       }
 
       martTicketSyncRef.current = true;
@@ -2308,6 +2325,16 @@ const getVendorGradient = (name = "") => {
     } finally {
       setTrackLoading(false);
     }
+  };
+
+  const handleLiveDeliveryTracking = (ticket) => {
+    setShowTrackModal(false);
+    navigate(`/deliveryTracking/${ticket.id}`, {
+      state: {
+        trackingMode: "customer",
+        returnTo: `/profilePage/${userType}/${userId}`,
+      },
+    });
   };
 
   const handleViewDetails = (ticket) => {
@@ -4419,6 +4446,14 @@ const getVendorGradient = (name = "") => {
           )}
         </Modal.Body>
         <Modal.Footer>
+          {String(trackedOrder?.status || "").toLowerCase() === "in progress" && (
+            <Button
+              variant="success"
+              onClick={() => handleLiveDeliveryTracking(trackedOrder)}
+            >
+              Track delivery live
+            </Button>
+          )}
           {trackedOrder?.categories?.length ? (
             <Button
               variant="outline-primary"
