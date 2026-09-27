@@ -944,14 +944,9 @@ const GroceryPaymentmethod = () => {
       CartStorage.clear();
       localStorage.removeItem(`cartMeta_${groceryItemId}`);
       window.alert(
-        `🎉 Thank You for Choosing the Handyman App Lakshmi Mart Services!\n` +
-          `Your Reference Order Number is ${martId}.\n` +
-          `Cashback Earned: ₹${cashback}\n` +
-          `Wallet Used: ₹${walletToUse}\n` +
-          `Current Wallet Balance: ₹${updatedWalletAmount}.\n` +
-          `Delivery Time Intimated Shortly!. 🎉`,
+        "Order placed successfully. Track your order from My Orders.",
       );
-      window.location.href = `/deliveryTracking/${groceryItemId}`;
+      window.location.href = `/profilePage/customer/${userId}`;
     } catch (error) {
       console.error("❌ Order placement error:", error);
       alert("Something went wrong while placing the order. Please try again.");

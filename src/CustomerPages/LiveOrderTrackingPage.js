@@ -283,11 +283,11 @@ export default function LiveOrderTrackingPage() {
         };
         animationFrameRef.current = requestAnimationFrame(animate);
       }
-      if (!map._hasFitTrackingBounds) {
+      if (!map._hasFitTrackingBounds && destination) {
         map.fitBounds(
           [
             [currentCourierPosition.lat, currentCourierPosition.lng],
-            ...(destination ? [[destination.lat, destination.lng]] : []),
+            [destination.lat, destination.lng],
           ],
           { padding: [64, 64], maxZoom: 15 },
         );
@@ -297,7 +297,6 @@ export default function LiveOrderTrackingPage() {
       }
     } else if (destination && !map._hasFitTrackingBounds) {
       map.setView([destination.lat, destination.lng], 14);
-      map._hasFitTrackingBounds = true;
     }
   }, [currentCourierPosition, destination]);
 
