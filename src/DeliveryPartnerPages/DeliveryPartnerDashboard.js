@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import { playNotificationSound } from "../CommonPages/notificationSound";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { getUserLocation } from "../utils/getLocation";
 
 // Same API host the rest of the live app (ProfilePage's delivery-partner
 // check, VendorOrdersPage, etc.) already talks to — keep this in sync so
@@ -11,6 +12,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 // everywhere.
 const API_BASE = "https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api";
 const ASSIGNED_ORDERS_POLL_INTERVAL_MS = 20000;
+const PRESENCE_POLL_INTERVAL_MS = 30000;
 
 const DeliveryPartnerDashboard = () => {
   const navigate = useNavigate();
@@ -39,6 +41,9 @@ const DeliveryPartnerDashboard = () => {
     inProgress: 0,
     delivered: 0,
   });
+  const presenceUpdateInFlightRef = useRef(false);
+  const [presencePrompt, setPresencePrompt] = useState("");
+  const [locationRetry, setLocationRetry] = useState(0);
 
   useEffect(() => {
     const handleResize = () => {
@@ -209,6 +214,58 @@ const DeliveryPartnerDashboard = () => {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRegistered, partnerStatus, userId]);
+
+  useEffect(() => {
+    const partnerRecordId = deliveryProfile?.id ?? deliveryProfile?.Id;
+    if (!(isRegistered && partnerStatus === "open" && partnerRecordId)) return undefined;
+    let cancelled = false;
+
+    const publishPresence = async () => {
+      if (presenceUpdateInFlightRef.current) return;
+      presenceUpdateInFlightRef.current = true;
+      try {
+        const location = await getUserLocation();
+        if (cancelled) return;
+        const onRide = orders.some((order) =>
+          String(order.status || order.Status || "").toLowerCase() === "in progress",
+        );
+        const payload = {
+          ...deliveryProfile,
+          currentLatitude: location.latitude,
+          currentLongitude: location.longitude,
+          liveLocationUpdatedAt: new Date().toISOString(),
+          isOnline: true,
+          availabilityStatus: onRide ? "On Ride" : "Available",
+        };
+        const response = await fetch(
+          `${API_BASE}/DeliveryPartner/UpdateDeliveryPartnerDetails?id=${encodeURIComponent(partnerRecordId)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        );
+        if (!response.ok) throw new Error("Presence update rejected");
+        setPresencePrompt("");
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Could not publish delivery partner presence:", error);
+          setPresencePrompt(
+            error?.message || "Turn on location and allow access to receive delivery rides.",
+          );
+        }
+      } finally {
+        presenceUpdateInFlightRef.current = false;
+      }
+    };
+
+    publishPresence();
+    const timer = window.setInterval(publishPresence, PRESENCE_POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [deliveryProfile, isRegistered, locationRetry, orders, partnerStatus]);
 
   const handleViewDetails = (order) => {
     setHasNewOrder(false);
@@ -387,6 +444,21 @@ const DeliveryPartnerDashboard = () => {
         {/* APPROVED DASHBOARD */}
         {isRegistered && partnerStatus === "open" && (
           <>
+            {presencePrompt && (
+              <div className="alert alert-warning d-flex justify-content-between align-items-center gap-3">
+                <span>
+                  Share your live location to appear Available and receive rides.
+                  <small className="d-block">{presencePrompt}</small>
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-dark flex-shrink-0"
+                  onClick={() => setLocationRetry((value) => value + 1)}
+                >
+                  Share location
+                </button>
+              </div>
+            )}
             {/* STATS */}
                 <div
                 className="row mb-4"

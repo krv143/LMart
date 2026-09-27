@@ -1,20 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { createOrderMap } from "../utils/orderMap";
+import { hasMapsKey } from "../utils/maps";
 
 // Same API_BASE pattern used in vendorListStore.js.
 const API_BASE =
   "https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api";
 const GET_ALL_MART_ITEMS = `${API_BASE}/Mart/GetAllMartItems`;
 
-const LEAFLET_CSS_URL =
-  "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
-const LEAFLET_JS_URL =
-  "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
-
-const DEFAULT_CENTER = [17.6868, 83.2185]; // Visakhapatnam
+const DEFAULT_CENTER = { lat: 17.6868, lng: 83.2185 }; // Visakhapatnam
 const EXACT_COLOR = "#3fb27f";
 const APPROX_COLOR = "#e0a63e";
 const HIGHLIGHT_COLOR = "#e53935";
+const ACTIVE_ROUTE_COLOR = "#16864a";
+const STALE_ROUTE_COLOR = "#dc7a18";
+const GPS_STALE_AFTER_MS = 3 * 60 * 1000;
 
 const POLL_INTERVAL_MS = 20000; // same cadence family as the ticket bell in SuperAdminNav.js
 
@@ -40,11 +40,7 @@ const toLocalDateInputValue = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-const getDefaultFromDate = () => {
-  const date = new Date();
-  date.setDate(date.getDate() - 6);
-  return toLocalDateInputValue(date);
-};
+const getToday = () => toLocalDateInputValue(new Date());
 
 const getOrderDate = (order) => order.date || order.Date;
 
@@ -72,6 +68,20 @@ const isZero = (v) => {
 const orderKey = (order) =>
   order.id || `${order.martId || ""}-${order.date || ""}-${order.customerId || ""}`;
 
+const getCourierLocation = (order) => {
+  const lat = Number(order.deliveryPartnerLatitude ?? order.DeliveryPartnerLatitude);
+  const lng = Number(order.deliveryPartnerLongitude ?? order.DeliveryPartnerLongitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
+  return { lat, lng };
+};
+
+const isCourierLocationStale = (order) => {
+  const timestamp = order.deliveryPartnerLocationUpdatedAt || order.DeliveryPartnerLocationUpdatedAt;
+  if (!timestamp) return true;
+  const updatedAt = new Date(timestamp).getTime();
+  return !Number.isFinite(updatedAt) || Date.now() - updatedAt > GPS_STALE_AFTER_MS;
+};
+
 const readIdSet = (key) => {
   try {
     return new Set(JSON.parse(sessionStorage.getItem(key) || "[]"));
@@ -85,61 +95,6 @@ const writeIdSet = (key, set) => {
   } catch {
     /* sessionStorage unavailable — highlight state just won't persist across reloads */
   }
-};
-
-// Loads a <script>/<link> once and resolves when ready. Safe to call
-// multiple times — later calls just resolve immediately.
-const loadOnce = (tag, attrs, checkLoaded) =>
-  new Promise((resolve, reject) => {
-    if (checkLoaded()) return resolve();
-    const existing = document.querySelector(`${tag}[data-loader="${attrs.id}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", reject);
-      return;
-    }
-    const el = document.createElement(tag);
-    Object.entries(attrs).forEach(([k, v]) => {
-      if (k === "id") el.setAttribute("data-loader", v);
-      else el[k] = v;
-    });
-    el.onload = () => resolve();
-    el.onerror = reject;
-    document.head.appendChild(el);
-  });
-
-const loadLeaflet = async () => {
-  await loadOnce(
-    "link",
-    { id: "leaflet-css", rel: "stylesheet", href: LEAFLET_CSS_URL },
-    () => !!document.querySelector('link[data-loader="leaflet-css"]'),
-  );
-  await loadOnce("script", { id: "leaflet-js", src: LEAFLET_JS_URL }, () => !!window.L);
-  return window.L;
-};
-
-// One-time CSS for the pulsing "new order" ring. Injected instead of an
-// external stylesheet so this component stays a single importable file.
-const ensurePulseStyle = () => {
-  if (document.getElementById("order-map-pulse-style")) return;
-  const style = document.createElement("style");
-  style.id = "order-map-pulse-style";
-  style.textContent = `
-    .order-map-pulse-dot { position: relative; width: 16px; height: 16px; }
-    .order-map-pulse-dot::before, .order-map-pulse-dot::after {
-      content: ""; position: absolute; inset: 0; border-radius: 50%;
-      background: ${HIGHLIGHT_COLOR};
-    }
-    .order-map-pulse-dot::before {
-      animation: order-map-pulse 1.4s ease-out infinite;
-    }
-    .order-map-pulse-dot::after { transform: scale(0.55); }
-    @keyframes order-map-pulse {
-      0% { transform: scale(0.55); opacity: 0.8; }
-      100% { transform: scale(2.4); opacity: 0; }
-    }
-  `;
-  document.head.appendChild(style);
 };
 
 // Best-effort pincode -> lat/lng lookup via the free OSM/Nominatim geocoder.
@@ -176,8 +131,8 @@ const normalizeOrders = (payload) => {
 
 const OrderLocationMapPage = () => {
   const mapContainerRef = useRef(null);
-  const mapRef = useRef(null);
-  const markerLayerRef = useRef(null);
+  const mapEngineRef = useRef(null);
+  const hasFitBoundsRef = useRef(false);
 
   const ordersRef = useRef([]); // last fetched orders, raw
   const resolvedRef = useRef(new Map()); // orderKey -> { lat, lng, approx } | null
@@ -185,12 +140,13 @@ const OrderLocationMapPage = () => {
   const unseenIdsRef = useRef(readIdSet(UNSEEN_IDS_KEY)); // new arrivals not yet opened
   const firstLoadRef = useRef(knownIdsRef.current.size === 0);
   const activeFiltersRef = useRef(new Set(FILTERS.map((f) => f.key)));
-  const fromDateRef = useRef(getDefaultFromDate());
-  const toDateRef = useRef(toLocalDateInputValue(new Date()));
+  const fromDateRef = useRef(getToday());
+  const toDateRef = useRef(getToday());
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [counts, setCounts] = useState({ exact: 0, approx: 0, failed: 0, unseen: 0 });
+  const [mapEngineName, setMapEngineName] = useState("");
+  const [counts, setCounts] = useState({ exact: 0, approx: 0, failed: 0, unseen: 0, active: 0, live: 0, attention: 0, delivered: 0 });
   const [activeFilters, setActiveFilters] = useState(activeFiltersRef.current);
   const [fromDate, setFromDate] = useState(fromDateRef.current);
   const [toDate, setToDate] = useState(toDateRef.current);
@@ -222,10 +178,10 @@ const OrderLocationMapPage = () => {
   // and unseen-highlight state. Does not touch the network — safe to call
   // on every filter toggle or click.
   const renderMarkers = () => {
-    const L = window.L;
-    if (!L || !mapRef.current || !markerLayerRef.current) return;
-    markerLayerRef.current.clearLayers();
-
+    const engine = mapEngineRef.current;
+    if (!engine) return;
+    const pins = [];
+    const routes = [];
     const bounds = [];
     ordersRef.current.forEach((order) => {
       if (!isInDateRange(order)) return;
@@ -237,63 +193,64 @@ const OrderLocationMapPage = () => {
       if (statusKey && !activeFiltersRef.current.has(statusKey)) return;
 
       const { lat, lng, approx } = resolved;
+      const completed = statusKey === "delivered";
       bounds.push([lat, lng]);
       const baseColor = approx ? APPROX_COLOR : EXACT_COLOR;
       const isUnseen = unseenIdsRef.current.has(key);
+      const courier = getCourierLocation(order);
+      const gpsStale = statusKey === "inprogress" && isCourierLocationStale(order);
 
-      let marker;
-      if (isUnseen) {
-        ensurePulseStyle();
-        marker = L.marker([lat, lng], {
-          icon: L.divIcon({
-            className: "",
-            html: `<div class="order-map-pulse-dot"></div>`,
-            iconSize: [16, 16],
-            iconAnchor: [8, 8],
-          }),
+      if (statusKey === "inprogress" && courier) {
+        bounds.push(courier);
+        routes.push({
+          path: [courier, { lat, lng }],
+          color: gpsStale ? STALE_ROUTE_COLOR : ACTIVE_ROUTE_COLOR,
+          dashed: gpsStale,
+          weight: 5,
         });
-      } else {
-        marker = L.circleMarker([lat, lng], {
-          radius: 8,
-          color: baseColor,
-          fillColor: baseColor,
-          fillOpacity: 0.85,
-          weight: 1.5,
+        pins.push({
+          id: `${key}-courier`,
+          lat: courier.lat,
+          lng: courier.lng,
+          color: ACTIVE_ROUTE_COLOR,
+          kind: "courier",
+          label: "D",
+          title: `Delivery partner · ${order.martId || "Order"}`,
+          popupContent: `Delivery partner\nOrder: ${order.martId || key}\nGPS: ${gpsStale ? "Needs attention" : "Live"}`,
         });
       }
 
-      marker.bindPopup(`
-        <div style="font-size:12.5px;line-height:1.5;max-width:220px;">
-          <b style="display:block;font-size:13px;margin-bottom:2px;">
-            ${order.customerName || "Unknown customer"}
-          </b>
-          Mart: ${order.martId || "—"}<br/>
-          Status: ${order.status || "—"} · ₹${order.grandTotal || "—"} ·
-          ${order.totalItemsSelected ?? "—"} items<br/>
-          ${order.address || ""}<br/>
-          ${order.district || ""}, ${order.state || ""} ${order.zipCode || ""}<br/>
-          <span style="font-weight:600;color:${approx ? APPROX_COLOR : EXACT_COLOR};">
-            ${approx ? "Approx. from pincode" : "Exact GPS"}
-          </span>
-          ${isUnseen ? `<br/><span style="font-weight:600;color:${HIGHLIGHT_COLOR};">New order</span>` : ""}
-        </div>
-      `);
-
-      // Viewing the order (opening its popup) clears the highlight —
-      // covers both a direct marker click and opening the popup any other way.
-      marker.on("popupopen", () => {
-        if (!unseenIdsRef.current.has(key)) return;
-        unseenIdsRef.current.delete(key);
-        writeIdSet(UNSEEN_IDS_KEY, unseenIdsRef.current);
-        setCounts((c) => ({ ...c, unseen: unseenIdsRef.current.size }));
-        renderMarkers(); // redraw this marker as a normal (non-pulsing) dot
+      const gpsStatus = statusKey === "inprogress"
+        ? courier
+          ? gpsStale ? "Needs attention · GPS is stale" : "Live · GPS updating"
+          : "Needs attention · courier GPS unavailable"
+        : "";
+      pins.push({
+        id: key,
+        lat,
+        lng,
+        color: completed ? "#198754" : isUnseen ? HIGHLIGHT_COLOR : baseColor,
+        kind: completed ? "delivered" : "customer",
+        label: completed ? "✓" : isUnseen ? "!" : "C",
+        title: `${order.customerName || "Customer"} · ${order.martId || "Order"}`,
+        popupContent: [
+          order.customerName || "Unknown customer",
+          `Order: ${order.martId || key}`,
+          `Status: ${order.status || "—"} · ₹${order.grandTotal || "—"}`,
+          `Address: ${[order.address, order.district, order.state, order.zipCode].filter(Boolean).join(", ") || "—"}`,
+          gpsStatus,
+          completed ? "✓ Delivery complete" : "",
+          approx ? "Approximate location from pincode" : "Customer GPS location",
+          isUnseen ? "New order" : "",
+        ].filter(Boolean).join("\n"),
       });
-
-      marker.addTo(markerLayerRef.current);
     });
 
-    if (bounds.length && firstLoadRef.current) {
-      mapRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+    engine.setPins(pins, () => {});
+    engine.setRoutes(routes);
+    if (bounds.length && !hasFitBoundsRef.current) {
+      engine.fitPoints(bounds);
+      hasFitBoundsRef.current = true;
     }
   };
 
@@ -315,9 +272,22 @@ const OrderLocationMapPage = () => {
     ordersRef.current = orders;
     let exact = 0,
       approx = 0,
-      failed = 0;
+      failed = 0,
+      active = 0,
+      live = 0,
+      attention = 0,
+      delivered = 0;
 
-    for (const order of orders.filter(isInDateRange)) {
+    const dateOrders = orders.filter(isInDateRange);
+    for (const order of dateOrders) {
+      const statusKey = normalizeStatus(order.status);
+      if (statusKey === "inprogress") {
+        active += 1;
+        if (getCourierLocation(order) && !isCourierLocationStale(order)) live += 1;
+        else attention += 1;
+      }
+      if (statusKey === "delivered") delivered += 1;
+
       const key = orderKey(order);
       const isNewId = !knownIdsRef.current.has(key);
 
@@ -357,7 +327,7 @@ const OrderLocationMapPage = () => {
     writeIdSet(UNSEEN_IDS_KEY, unseenIdsRef.current);
     firstLoadRef.current = false;
 
-    setCounts({ exact, approx, failed, unseen: unseenIdsRef.current.size });
+    setCounts({ exact, approx, failed, unseen: unseenIdsRef.current.size, active, live, attention, delivered });
     setLoading(false);
     renderMarkers();
   };
@@ -366,7 +336,7 @@ const OrderLocationMapPage = () => {
     fromDateRef.current = fromDate;
     toDateRef.current = toDate;
     if (fromDate > toDate) return;
-    if (mapRef.current) {
+    if (mapEngineRef.current) {
       setLoading(true);
       fetchAndRender();
     }
@@ -379,14 +349,19 @@ const OrderLocationMapPage = () => {
     let pollHandle = null;
 
     (async () => {
-      const L = await loadLeaflet();
-      if (cancelled) return;
-      mapRef.current = L.map(mapContainerRef.current).setView(DEFAULT_CENTER, 12);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: "&copy; OpenStreetMap contributors",
-      }).addTo(mapRef.current);
-      markerLayerRef.current = L.layerGroup().addTo(mapRef.current);
+      mapEngineRef.current = await createOrderMap(
+        mapContainerRef.current,
+        { center: DEFAULT_CENTER, zoom: 12 },
+      );
+      if (cancelled) {
+        mapEngineRef.current.destroy();
+        mapEngineRef.current = null;
+        return;
+      }
+      setMapEngineName(
+        mapEngineRef.current.kind === "google" ? "Google Maps" : "OpenStreetMap fallback",
+      );
+      window.setTimeout(() => mapEngineRef.current?.invalidate(), 0);
 
       await fetchAndRender();
       pollHandle = setInterval(fetchAndRender, POLL_INTERVAL_MS);
@@ -395,8 +370,8 @@ const OrderLocationMapPage = () => {
     return () => {
       cancelled = true;
       if (pollHandle) clearInterval(pollHandle);
-      mapRef.current?.remove();
-      mapRef.current = null;
+      mapEngineRef.current?.destroy();
+      mapEngineRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -421,9 +396,12 @@ const OrderLocationMapPage = () => {
         }}
       >
         <div>
-          <h5 style={{ margin: 0 }}>Order Location Map</h5>
+          <h5 style={{ margin: 0 }}>Delivery Operations Monitor</h5>
           <small className="text-muted">
-            Orange = pincode estimate · Red pulse = new order, not yet opened
+            Solid green route = live · Dashed orange = stale GPS · Green check = delivered
+          </small>
+          <small className="d-block text-muted mt-1">
+            {mapEngineName || (hasMapsKey() ? "Connecting to Google Maps…" : "Google Maps key missing · using OpenStreetMap fallback")}
           </small>
         </div>
         <button
@@ -438,6 +416,17 @@ const OrderLocationMapPage = () => {
       <div
         style={{ display: "flex", gap: 8, flexWrap: "wrap", padding: "0 4px 8px" }}
       >
+        <button
+          type="button"
+          className={`btn btn-sm ${fromDate === getToday() && toDate === getToday() ? "btn-success" : "btn-outline-success"}`}
+          onClick={() => {
+            const today = getToday();
+            setFromDate(today);
+            setToDate(today);
+          }}
+        >
+          Today
+        </button>
         <label className="d-flex align-items-center gap-1 mb-0">
           <span className="small text-muted">From</span>
           <input
@@ -486,6 +475,13 @@ const OrderLocationMapPage = () => {
             {counts.unseen} new
           </span>
         )}
+      </div>
+
+      <div className="d-flex flex-wrap gap-3 small" style={{ padding: "0 4px 8px" }}>
+        <span><strong>{counts.active}</strong> active deliveries</span>
+        <span className="text-success"><strong>{counts.live}</strong> live GPS</span>
+        <span className="text-warning"><strong>{counts.attention}</strong> need attention</span>
+        <span className="text-success"><strong>{counts.delivered}</strong> delivered</span>
       </div>
 
       <small className="text-muted d-block" style={{ padding: "0 4px 8px" }}>

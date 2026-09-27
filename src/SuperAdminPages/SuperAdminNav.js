@@ -13,6 +13,7 @@ import { speakTeluguAlert } from "../CommonPages/speechAlert";
 const TABS = [
   { label: "Vendors", path: "/superadmin/vendors" },
   { label: "Delivery Partners", path: "/superadmin/delivery-partners" },
+  { label: "Live Fleet", path: "/superadmin/delivery-map" },
   { label: "Orders", path: "/superadmin/orders" },
 ];
 

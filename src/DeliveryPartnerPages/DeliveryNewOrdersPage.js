@@ -105,6 +105,7 @@ const DeliveryNewOrdersPage = () => {
   const [orders, setOrders] = useState([]);
   const [myLoc, setMyLoc] = useState(null);
   const [locDenied, setLocDenied] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const [selectedId, setSelectedId] = useState(null);
   const [acceptingId, setAcceptingId] = useState(null);
   const [error, setError] = useState("");
@@ -214,11 +215,13 @@ const DeliveryNewOrdersPage = () => {
   // ---------- my location ----------
   const locate = useCallback(async () => {
     setLocDenied(false);
+    setLocationError("");
     try {
       const { latitude, longitude } = await getUserLocation();
       setMyLoc({ lat: latitude, lng: longitude });
     } catch (e) {
       console.warn("Location unavailable:", e);
+      setLocationError(e?.message || "Turn on device location and allow access to see and accept rides.");
       setLocDenied(true);
     }
   }, []);
@@ -411,6 +414,12 @@ const DeliveryNewOrdersPage = () => {
   // ---------- actions ----------
   const handleAccept = async (order) => {
     if (acceptingId) return;
+    if (!myLoc) {
+      setLocDenied(true);
+      setError("Share your current location before accepting a delivery ride.");
+      locate();
+      return;
+    }
     if (blockedReason) {
       setError(`Can't accept orders: ${blockedReason}`);
       return;
@@ -571,7 +580,7 @@ const DeliveryNewOrdersPage = () => {
               {selectedNew ? (
                 <button
                   className="btn btn-danger w-100 mt-3"
-                  disabled={acceptingId === selectedNew.id}
+                  disabled={!myLoc || acceptingId === selectedNew.id}
                   onClick={() => handleAccept(selectedNew)}
                 >
                   {acceptingId === selectedNew.id ? "Accepting…" : "Accept order"}
@@ -626,9 +635,12 @@ const DeliveryNewOrdersPage = () => {
             {message && <div className="alert alert-success py-2">{message}</div>}
             {locDenied && (
               <div className="alert alert-info py-2 d-flex justify-content-between align-items-center">
-                <span>Turn on location to see the nearest orders first.</span>
+                <span>
+                  Turn on your device location and allow access to see and accept rides.
+                  {locationError && <small className="d-block">{locationError}</small>}
+                </span>
                 <button className="btn btn-sm btn-outline-primary" onClick={locate}>
-                  Retry
+                  Share location
                 </button>
               </div>
             )}
@@ -673,10 +685,8 @@ const DeliveryNewOrdersPage = () => {
             <h6 className="fw-bold mt-3 mb-2">
               New orders{radiusActive ? ` within ${radiusKm} km` : ""} ({shownOrders.length})
             </h6>
-            {radiusKm > 0 && !myLoc && (
-              <div className="small text-muted mb-2">
-                Your location isn't available, so orders at every distance are shown.
-              </div>
+            {!myLoc && !locDenied && (
+              <div className="small text-muted mb-2">Checking your location before enabling ride requests…</div>
             )}
             {shownOrders.length === 0 && (
               <div className="card border-0 shadow-sm text-center p-4 text-muted" style={{ borderRadius: 14 }}>
@@ -723,7 +733,7 @@ const DeliveryNewOrdersPage = () => {
                   </div>
                   <button
                     className="btn btn-danger w-100 mt-3"
-                    disabled={acceptingId === o.id}
+                      disabled={!myLoc || acceptingId === o.id}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleAccept(o);

@@ -61,7 +61,9 @@ import DeliveryOrderDetailsPage from "./DeliveryPartnerPages/DeliveryOrderDetail
 import AddressPage from "./CustomerPages/AddressPage.js";
 import LiveOrderTrackingPage from "./CustomerPages/LiveOrderTrackingPage";
 import SuperAdminDeliveryPartnersPage from "./SuperAdminPages/SuperAdminDeliveryPartnersPage.js";
+import SuperAdminDeliveryMapPage from "./SuperAdminPages/SuperAdminDeliveryMapPage.js";
 import SuperAdminOrdersPage from "./SuperAdminPages/SuperAdminOrdersPage.js";
+import OrderLocationMapPage from "./AdminPages/OrderLocationMapPage.js";
 import AdminOrderClose from "./AdminPages/AdminOrderClose.js";
 // import OneRupeeGroceryItems from './OneRupeeGroceryItems.js';
 // import CustomerLocation from "./CustomerLocation.js";
@@ -300,11 +302,29 @@ function App() {
             />
 
             <Route
+              path="/superadmin/order-map"
+              element={
+                <SuperAdminGuard>
+                  <OrderLocationMapPage />
+                </SuperAdminGuard>
+              }
+            />
+
+            <Route
               path="/superadmin/delivery-partners"
               element={
                 <SuperAdminGuard>
                   {" "}
                   <SuperAdminDeliveryPartnersPage />
+                </SuperAdminGuard>
+              }
+            />
+
+            <Route
+              path="/superadmin/delivery-map"
+              element={
+                <SuperAdminGuard>
+                  <SuperAdminDeliveryMapPage />
                 </SuperAdminGuard>
               }
             />

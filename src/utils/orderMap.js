@@ -32,7 +32,45 @@ const radiusBounds = (loc, km) => {
 };
 
 // ---------------------------------------------------------------- Leaflet
-const pinIcon = ({ label, color = "#dc3545", selected }) => {
+const escapeMarkup = (value) =>
+  String(value || "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character]);
+
+const pinIcon = ({ label, color = "#dc3545", selected, kind }) => {
+  if (kind === "fleet") {
+    const name = escapeMarkup(label || "Delivery partner");
+    return L.divIcon({
+      className: "hm-pin",
+      html:
+        `<div style="display:flex;align-items:center;gap:4px;width:164px;height:36px;white-space:nowrap">` +
+        `<span style="width:32px;height:32px;flex:0 0 32px;border:2px solid #fff;border-radius:50%;background:${color};box-shadow:0 2px 8px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:bold 14px sans-serif">D</span>` +
+        `<span style="max-width:124px;overflow:hidden;text-overflow:ellipsis;padding:3px 7px;border-radius:10px;background:#fff;color:#263238;box-shadow:0 1px 5px rgba(0,0,0,.3);font:600 11px/1.2 sans-serif">${name}</span>` +
+        `</div>`,
+      iconSize: [164, 36],
+      iconAnchor: [16, 18],
+    });
+  }
+  if (kind === "courier") {
+    return L.divIcon({
+      className: "hm-pin",
+      html: '<div style="width:34px;height:34px;border:2px solid #fff;border-radius:50%;background:#16864a;box-shadow:0 2px 8px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:bold 16px sans-serif">D</div>',
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+    });
+  }
+  if (kind === "delivered") {
+    return L.divIcon({
+      className: "hm-pin",
+      html: '<div style="width:30px;height:30px;border:2px solid #fff;border-radius:50%;background:#198754;box-shadow:0 2px 7px rgba(0,0,0,.4);display:grid;place-items:center;color:#fff;font:bold 20px sans-serif">✓</div>',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+    });
+  }
   const size = selected ? 38 : 30;
   const html =
     `<div style="position:relative;width:${size}px;height:${size}px">` +
@@ -79,6 +117,7 @@ function createLeafletEngine(el, { center, zoom }, { onTileError } = {}) {
     });
   }
   const pinsLayer = L.layerGroup().addTo(map);
+  const routesLayer = L.layerGroup().addTo(map);
   let me = null;
   let circle = null;
 
@@ -125,8 +164,27 @@ function createLeafletEngine(el, { center, zoom }, { onTileError } = {}) {
           title: p.title,
           zIndexOffset: p.selected ? 900 : 0,
         });
+        if (p.popupContent) {
+          m.bindPopup(() => {
+            const content = document.createElement("div");
+            content.style.whiteSpace = "pre-line";
+            content.textContent = p.popupContent;
+            return content;
+          });
+        }
         m.on("click", () => onClick(p.id));
         pinsLayer.addLayer(m);
+      });
+    },
+    setRoutes(routes) {
+      routesLayer.clearLayers();
+      routes.forEach((route) => {
+        L.polyline(route.path.map((point) => [point.lat, point.lng]), {
+          color: route.color,
+          weight: route.weight || 5,
+          opacity: 0.85,
+          dashArray: route.dashed ? "9 9" : null,
+        }).addTo(routesLayer);
       });
     },
     fitPoints(points) {
@@ -161,6 +219,7 @@ async function createGoogleEngine(el, { center, zoom }) {
     fullscreenControl: false,
   });
   let markers = [];
+  let routeLines = [];
   let me = null;
   let circle = null;
 
@@ -206,17 +265,72 @@ async function createGoogleEngine(el, { center, zoom }) {
     setPins(pins, onClick) {
       markers.forEach((m) => m.setMap(null));
       markers = pins.map((p) => {
+        const name = String(p.label || "Delivery partner").slice(0, 24)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        const fleetSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="190" height="42" viewBox="0 0 190 42"><circle cx="19" cy="21" r="16" fill="${p.color || "#16864a"}" stroke="white" stroke-width="3"/><text x="19" y="26" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="white">D</text><rect x="38" y="5" width="148" height="32" rx="14" fill="white" stroke="${p.color || "#16864a"}" stroke-width="2"/><text x="46" y="25" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="#263238">${name}</text></svg>`;
         const m = new maps.Marker({
           position: { lat: p.lat, lng: p.lng },
           map,
           title: p.title,
-          label: { text: String(p.label ?? ""), color: "#ffffff", fontWeight: "700" },
+          icon: p.kind === "fleet"
+            ? {
+                url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(fleetSvg)}`,
+                scaledSize: new maps.Size(190, 42),
+                anchor: new maps.Point(19, 21),
+              }
+            : p.kind === "courier"
+            ? {
+                path: maps.SymbolPath.CIRCLE,
+                scale: 12,
+                fillColor: "#16864a",
+                fillOpacity: 1,
+                strokeColor: "#ffffff",
+                strokeWeight: 2,
+              }
+            : {
+                path: maps.SymbolPath.CIRCLE,
+                scale: p.selected ? 13 : 10,
+                fillColor: p.color || "#dc3545",
+                fillOpacity: 1,
+                strokeColor: "#ffffff",
+                strokeWeight: 2,
+              },
+          label: p.kind === "fleet"
+            ? undefined
+            : { text: String(p.label ?? ""), color: "#ffffff", fontWeight: "700", fontSize: "12px" },
           zIndex: p.selected ? 999 : 1,
           animation: p.selected ? maps.Animation.BOUNCE : null,
         });
+        if (p.popupContent) {
+          const content = document.createElement("div");
+          content.style.whiteSpace = "pre-line";
+          content.textContent = p.popupContent;
+          const info = new maps.InfoWindow({ content });
+          m.addListener("click", () => info.open({ map, anchor: m }));
+        }
         m.addListener("click", () => onClick(p.id));
         return m;
       });
+    },
+    setRoutes(routes) {
+      routeLines.forEach((line) => line.setMap(null));
+      routeLines = routes.map((route) => new maps.Polyline({
+        map,
+        path: route.path,
+        strokeColor: route.color,
+        strokeOpacity: 0.88,
+        strokeWeight: route.weight || 5,
+        ...(route.dashed ? {
+          icons: [{
+            icon: { path: "M 0,-1 0,1", strokeOpacity: 1, scale: 3 },
+            offset: "0",
+            repeat: "14px",
+          }],
+          strokeOpacity: 0,
+        } : {}),
+      }));
     },
     fitPoints(points) {
       if (points.length === 1) {
@@ -241,6 +355,7 @@ async function createGoogleEngine(el, { center, zoom }) {
     invalidate() {},
     destroy() {
       markers.forEach((m) => m.setMap(null));
+      routeLines.forEach((line) => line.setMap(null));
       if (me) me.setMap(null);
       if (circle) circle.setMap(null);
       el.innerHTML = "";
