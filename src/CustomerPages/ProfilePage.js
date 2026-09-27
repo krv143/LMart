@@ -22,6 +22,7 @@ import { playNotificationSound } from "../CommonPages/notificationSound";
 import { speakAlert, speakTeluguAlert } from "../CommonPages/speechAlert";
 import { useNavigate, useParams } from "react-router-dom";
 import Logo from "../img/Hm_Logo 1.png";
+import HandyManCharacter from "../img/hm_char.png";
 import SearchIcon from "@mui/icons-material/Search";
 import LogoutIcon from "@mui/icons-material/Logout";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
@@ -406,7 +407,9 @@ const [vendorCategoryDetails, setVendorCategoryDetails] = useState({});
   const [showWalletMessage, setShowWalletMessage] = useState(false);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(
-    () => localStorage.getItem(`hm_push_enabled_${userId}`) === "true",
+    () =>
+      localStorage.getItem(`hm_push_enabled_${userId}`) === "true" ||
+      PushNotificationService.isEnabled(),
   );
   const [pushDismissed, setPushDismissed] = useState(
     () => sessionStorage.getItem("hm_push_dismissed") === "true",
@@ -4584,35 +4587,52 @@ const getVendorGradient = (name = "") => {
         </Modal.Footer>
       </Modal>
 
-     {pushSupported && !pushEnabled && !pushDismissed && userId && (
-        <div className="push-notification-banner">
-          <div className="push-notification-banner-content">
-            <NotificationsActiveIcon
-              style={{ fontSize: 24, color: "#ff9800" }}
+      {pushSupported && !pushEnabled && !pushDismissed && userId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="push-opt-in-title"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1600,
+            overflowY: "auto",
+            display: "grid",
+            placeItems: "center",
+            padding: 20,
+            background: "rgba(255,255,255,.98)",
+          }}
+        >
+          <section style={{ width: "100%", maxWidth: 500, textAlign: "left" }}>
+            <h2 id="push-opt-in-title" style={{ fontSize: 30, lineHeight: 1.2, fontWeight: 750, color: "#151515" }}>
+              Get updates on your order status
+            </h2>
+            <p style={{ marginTop: 18, color: "#676767", fontSize: 18, lineHeight: 1.4 }}>
+              Allow push notifications to get real-time updates on your order status.
+            </p>
+            <img
+              src={HandyManCharacter}
+              alt="Delivery partner carrying an order and notification bell"
+              style={{ display: "block", width: "min(78%, 310px)", height: 310, objectFit: "contain", margin: "24px auto" }}
             />
-            <div style={{ flex: 1 }}>
-              <strong>Stay Updated!</strong>
-              <p style={{ margin: 0, fontSize: 13 }}>
-                Get instant alerts on orders, offers & more
-              </p>
-            </div>
             <button
-              className="btn btn-sm btn-warning"
+              type="button"
               onClick={handleEnablePush}
               disabled={pushLoading}
-              style={{ whiteSpace: "nowrap" }}
+              className="btn w-100"
+              style={{ minHeight: 66, borderRadius: 12, background: "#f4510b", color: "#fff", fontSize: 18, fontWeight: 700 }}
             >
-              {pushLoading ? "Enabling..." : "Enable"}
+              {pushLoading ? "Enabling notifications…" : "Turn on Notification"}
             </button>
             <button
-              className="btn btn-sm btn-light ms-1"
+              type="button"
               onClick={handleDismissPush}
-              style={{ padding: "2px 8px", fontSize: 16, lineHeight: 1 }}
-              title="Dismiss"
+              className="btn btn-link w-100 mt-3"
+              style={{ color: "#d94b12", fontSize: 17, fontWeight: 650, textDecoration: "none" }}
             >
-              &times;
+              Not Now
             </button>
-          </div>
+          </section>
         </div>
       )}
 
