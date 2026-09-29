@@ -19,10 +19,9 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import DeliveryDiningIcon from "@mui/icons-material/DeliveryDining";
 import PermIdentityIcon from "@mui/icons-material/PermIdentity";
 import { playNotificationSound } from "../CommonPages/notificationSound";
-import { speakAlert, speakTeluguAlert } from "../CommonPages/speechAlert";
-import { useNavigate, useParams } from "react-router-dom";
+import { speakAlert } from "../CommonPages/speechAlert";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Logo from "../img/Hm_Logo 1.png";
-import HandyManCharacter from "../img/hm_char.png";
 import SearchIcon from "@mui/icons-material/Search";
 import LogoutIcon from "@mui/icons-material/Logout";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
@@ -72,12 +71,12 @@ import AddIcCallIcon from "@mui/icons-material/AddIcCall";
 import RoyalImg from "../img/LMartLogo.jpeg";
 import HomeElectricalImg from "../img/HomeElectrical.jpeg";
 import HomePlumbingImg from "../img/HomePlumbing.jpeg";
-import OffersBannerModal from "../CustomerPages/OffersBannerModal.js";
+import OffersBannerModal from "./OffersBannerModal.js";
 import LiveChatWidget from "../components/LiveChatWidget";
 import PushNotificationService from "../utils/PushNotificationService";
 import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+// import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+// import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import {
   getVendorProfileById,
   makePlaceholderImage,
@@ -242,7 +241,6 @@ const groceryCategories = [
   // { label: 'Hangers & Hooks', value: 'Hangers & Hooks', image: Hardware },  
 ];
 
-
 const BLOB_BASE_URL =
   "https://lmartfiles.blob.core.windows.net/userattechements";
 
@@ -287,6 +285,7 @@ const ProfilePage = () => {
   // vendorId -> [{ id, categoryName, image }]  (Approved only)
 const [vendorCategoryDetails, setVendorCategoryDetails] = useState({});
   const navigate = useNavigate();
+  const location = useLocation();
   const handleVendorPortal = () => {
      const vendorId = localStorage.getItem("vendorSession");
     if (vendorId) {
@@ -407,9 +406,7 @@ const [vendorCategoryDetails, setVendorCategoryDetails] = useState({});
   const [showWalletMessage, setShowWalletMessage] = useState(false);
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(
-    () =>
-      localStorage.getItem(`hm_push_enabled_${userId}`) === "true" ||
-      PushNotificationService.isEnabled(),
+    () => localStorage.getItem(`hm_push_enabled_${userId}`) === "true",
   );
   const [pushDismissed, setPushDismissed] = useState(
     () => sessionStorage.getItem("hm_push_dismissed") === "true",
@@ -427,23 +424,27 @@ const [vendorCategoryDetails, setVendorCategoryDetails] = useState({});
   const [selectedVendorJsonCategory, setSelectedVendorJsonCategory] =
     useState("");
     const [preferLMartDefault, setPreferLMartDefault] = useState(false);
-  const vendorTabsRef = useRef(null);
+useEffect(() => {
+  const returnedVendorId =
+    location.state?.selectedVendorId ||
+    localStorage.getItem("selectedVendorId");
 
-  useEffect(() => {
-    if (!selectedMartTab || !vendorTabsRef.current) return;
+  if (!returnedVendorId) return;
 
-    const activeTab = vendorTabsRef.current.querySelector(
-      `[data-vendor-id="${selectedMartTab}"]`,
+  const vendorExists = approvedVendorListJson.some(
+    (v) => String(v.vendorId) === String(returnedVendorId)
+  );
+
+  if (vendorExists) {
+    setSelectedMartTab(String(returnedVendorId));
+
+    localStorage.setItem(
+      "selectedVendorId",
+      String(returnedVendorId)
     );
+  }
+}, [location.state, approvedVendorListJson]);
 
-    if (activeTab) {
-      activeTab.scrollIntoView({
-        behavior: "smooth",
-        inline: "center",
-        block: "nearest",
-      });
-    }
-  }, [selectedMartTab]);
   useEffect(() => {
     const vendor = approvedVendorListJson.find(
       (v) => v.vendorId === selectedMartTab,
@@ -451,10 +452,10 @@ const [vendorCategoryDetails, setVendorCategoryDetails] = useState({});
     setSelectedVendorJsonCategory(vendor?.categories?.[0]?.category || "");
   }, [selectedMartTab, approvedVendorListJson]);
 
-  const scrollVendorTabs = (direction) => {
-    if (!vendorTabsRef.current) return;
-    vendorTabsRef.current.scrollBy({ left: direction * 180, behavior: "smooth" });
-  };
+  // const scrollVendorTabs = (direction) => {
+  //   if (!vendorTabsRef.current) return;
+  //   vendorTabsRef.current.scrollBy({ left: direction * 180, behavior: "smooth" });
+  // };
 
   const LMART_FALLBACK_PINCODE = DEFAULT_PINCODE; 
   useEffect(() => {
@@ -539,41 +540,30 @@ let approvedVendors = (Array.isArray(vendors) ? vendors : [])
         );
 
         if (approvedVendors.length > 0) {
-          setSelectedMartTab((current) => {
-  let lastOrderedVendor = null;
+   
+setSelectedMartTab((current) => {
+  // 1. Restore the vendor selected before opening Grocery Items
+  const savedVendorId =
+    localStorage.getItem("selectedVendorId");
 
-  try {
-    lastOrderedVendor = JSON.parse(
-      localStorage.getItem("lastOrderedVendor") || "null"
-    );
-  } catch (error) {
-    console.error("Invalid lastOrderedVendor:", error);
-  }
-
-  // 1. Select the vendor from the most recent successful order
-  const lastOrderedMatch = approvedVendors.find(
-    (v) => v.vendorId === lastOrderedVendor?.vendorId
+  const savedVendor = approvedVendors.find(
+    (v) => v.vendorId === savedVendorId
   );
 
-  if (lastOrderedMatch) {
-    localStorage.setItem(
-      "selectedVendorId",
-      lastOrderedMatch.vendorId
-    );
-
-    return lastOrderedMatch.vendorId;
+  if (savedVendor) {
+    return savedVendor.vendorId;
   }
 
-  // 2. Keep the currently selected vendor if it still exists
-  const currentExists = approvedVendors.some(
+  // 2. Otherwise, use the current selection if available
+  const currentVendor = approvedVendors.find(
     (v) => v.vendorId === current
   );
 
-  if (currentExists && !usedFallback) {
-    return current;
+  if (currentVendor && !usedFallback) {
+    return currentVendor.vendorId;
   }
 
-  // 3. Existing fallback/default behavior
+  // 3. Otherwise, retain your existing default behavior
   let nextVendorId;
 
   if (usedFallback) {
@@ -587,9 +577,8 @@ let approvedVendors = (Array.isArray(vendors) ? vendors : [])
           .replace(/\s+/g, "") === "lmart"
     );
 
-    nextVendorId = lmartVendor
-      ? lmartVendor.vendorId
-      : approvedVendors[0].vendorId;
+    nextVendorId =
+      lmartVendor?.vendorId || approvedVendors[0].vendorId;
   } else {
     nextVendorId = approvedVendors[0].vendorId;
   }
@@ -1250,8 +1239,8 @@ useEffect(() => {
   const getVendorCategoryImage = (cat) => {
     const match =
       groceryCategories.find((c) => c.value === cat) ||
-      categories.find((c) => c.value === cat);
-    if (match) return match.image; 
+      categories.find((c) => c.value === cat) 
+    if (match) return match.image;
     return makePlaceholderImage(cat, "ff5722", "ffffff");
   };
 
@@ -2128,7 +2117,6 @@ const getVendorGradient = (name = "") => {
 
       const nextSeenMap = { ...seenMap };
       const updatedTickets = [];
-      const startedDeliveries = [];
 
       (Array.isArray(martTickets) ? martTickets : []).forEach((ticket) => {
         const ticketKey = String(ticket?.id || ticket?.martId || "").trim();
@@ -2145,15 +2133,6 @@ const getVendorGradient = (name = "") => {
         if (seenMap[ticketKey] !== signature) {
           nextSeenMap[ticketKey] = signature;
           updatedTickets.push(ticket);
-          const previousStatus = String(seenMap[ticketKey] || "")
-            .split("|")[0]
-            .toLowerCase();
-          if (
-            previousStatus !== "in progress" &&
-            String(ticket?.status || "").toLowerCase() === "in progress"
-          ) {
-            startedDeliveries.push(ticket);
-          }
         }
       });
 
@@ -2170,13 +2149,6 @@ const getVendorGradient = (name = "") => {
         if (PushNotificationService.isEnabled()) {
           PushNotificationService.show("Handyman Order Update", message);
         }
-      }
-
-      if (startedDeliveries.length > 0) {
-        const startedOrder = startedDeliveries[startedDeliveries.length - 1];
-        speakTeluguAlert(
-          `మీ ఆర్డర్ ${startedOrder?.martId || ""} డెలివరీ కోసం బయలుదేరింది. ట్రాక్ చేయడానికి ట్రాక్ డెలివరీ బటన్ నొక్కండి.`,
-        );
       }
 
       martTicketSyncRef.current = true;
@@ -2328,16 +2300,6 @@ const getVendorGradient = (name = "") => {
     } finally {
       setTrackLoading(false);
     }
-  };
-
-  const handleLiveDeliveryTracking = (ticket) => {
-    setShowTrackModal(false);
-    navigate(`/deliveryTracking/${ticket.id}`, {
-      state: {
-        trackingMode: "customer",
-        returnTo: `/profilePage/${userType}/${userId}`,
-      },
-    });
   };
 
   const handleViewDetails = (ticket) => {
@@ -3874,9 +3836,9 @@ const getVendorGradient = (name = "") => {
                 <div className="shadow-lg p-2 rounded-5 text-center bg-transparent border-0">
                   {/* Vendor Tabs */}
                   <div className="d-flex align-items-center mb-3" style={{ gap: "6px", marginBottom: "5px" }}>
-                  <button
+                  {/* <button
                     type="button"
-                    onClick={() => scrollVendorTabs(-1)}
+                    // onClick={() => scrollVendorTabs(-1)}
                     aria-label="Scroll stores left"
                     style={{
                       flex: "0 0 auto",
@@ -3891,14 +3853,14 @@ const getVendorGradient = (name = "") => {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      lineHeight: 1,
+                      lineHeight: 1,     
                       cursor: "pointer",
                     }}
                   >
-                      <ArrowBackIcon style={{ fontSize: 16 }} />
-                  </button>
+                      <ArrowBackIcon style={{ fontSize: 16 }} /> 
+                  </button> */}
                   <div
-                    ref={vendorTabsRef}
+                    // ref={vendorTabsRef}
                     className="vendor-tabs-wrapper "
                     style={{
                       width: "100%",
@@ -3909,13 +3871,13 @@ const getVendorGradient = (name = "") => {
                       padding: "8px",
                     }}
                   >
-                    <div
+                    {/* <div
                       className="d-flex align-items-center gap-2"
                       style={{
                         width: "max-content",
                       }}
                     >
-{/* Vendor Store Cards */}
+* Vendor Store Cards *
 {approvedVendorListJson.map((v) => {
   const isActive = selectedMartTab === v.vendorId;
   const palette = getVendorGradient(v.storeName);
@@ -3927,8 +3889,10 @@ const getVendorGradient = (name = "") => {
       key={v.vendorId}
       data-vendor-id={v.vendorId}
       onClick={() => {
-        setSelectedMartTab(v.vendorId);
-        localStorage.setItem("selectedVendorId", v.vendorId);
+        console.log("Selected vendor:", v.storeName);
+  console.log("Selected vendor ID:", v.vendorId);
+        setSelectedMartTab(String(v.vendorId));
+        localStorage.setItem("selectedVendorId", String(v.vendorId));
       }}
       className="vendor-store-card"
       style={{
@@ -3940,7 +3904,7 @@ const getVendorGradient = (name = "") => {
           : "0 2px 8px rgba(0,0,0,0.08)",
       }}
     >
-      {/* Store Icon */}
+     * Store Icon *
       <div
         className="vendor-store-icon"
         style={{
@@ -3965,7 +3929,7 @@ const getVendorGradient = (name = "") => {
         )}
       </div>
 
-      {/* Store Name */}
+      * Store Name *
       <span
         className="vendor-store-name"
         style={{
@@ -3975,7 +3939,7 @@ const getVendorGradient = (name = "") => {
         {v.storeName || "Vendor Store"}
       </span>
 
-      {/* Selected Indicator */}
+      * Selected Indicator *
       {isActive && (
         <span
           className="vendor-store-selected"
@@ -3988,12 +3952,163 @@ const getVendorGradient = (name = "") => {
   );
 })}
 
-                    </div>
+                    </div> */}
+
+                  {/* Vendor Stores - 3 Cards Per Row */}
+<div
+  className="vendor-stores-grid"
+  style={{
+    display: "grid",
+    gridTemplateColumns: isMobile
+      ? "repeat(3, minmax(0, 1fr))"
+      : "repeat(3, minmax(0, 1fr))",
+    gap: isMobile ? "8px" : "12px",
+    width: "100%",
+    padding: isMobile ? "5px" : "8px",
+  }}
+>
+  {approvedVendorListJson.map((v) => {
+    const isActive = String(selectedMartTab) === String(v.vendorId);
+    const palette = getVendorGradient(v.storeName);
+    const vendorImage = vendorStoreImages[v.vendorId];
+
+    return (
+      <button
+        type="button"
+        key={v.vendorId}
+        data-vendor-id={v.vendorId}
+        onClick={() => {
+          console.log("Selected vendor:", v.storeName);
+          console.log("Selected vendor ID:", v.vendorId);
+
+          setSelectedMartTab(String(v.vendorId));
+
+          localStorage.setItem(
+            "selectedVendorId",
+            String(v.vendorId)
+          );
+        }}
+        className="vendor-store-card"
+        style={{
+          width: "100%",
+          minWidth: 0,
+          height: isMobile ? "125px" : "150px",
+          padding: isMobile ? "8px 5px" : "10px",
+          borderRadius: "14px",
+          border: isActive
+            ? `2px solid ${palette.solid}`
+            : "1px solid #e5e5e5",
+          background: "#fff",
+          boxShadow: isActive
+            ? `0 4px 12px ${palette.shadow}`
+            : "0 2px 8px rgba(0,0,0,0.08)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
+        }}
+      >
+        {/* Vendor Store Icon */}
+        <div
+          className="vendor-store-icon"
+          style={{
+            width: isMobile ? "58px" : "75px",
+            height: isMobile ? "58px" : "75px",
+            borderRadius: "50%",
+            border: `2px solid ${palette.light}`,
+            background: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            marginBottom: "7px",
+            flexShrink: 0,
+          }}
+        >
+          {vendorImage ? (
+            <img
+              src={vendorImage}
+              alt={v.storeName || "Vendor"}
+              loading="lazy"
+              decoding="async"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <span
+              className="vendor-store-placeholder"
+              style={{
+                fontSize: isMobile ? "22px" : "28px",
+                fontWeight: "700",
+                color: palette.solid,
+              }}
+            >
+              {(v.storeName || "S").charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
+
+        {/* Vendor Store Name */}
+        <span
+          className="vendor-store-name"
+          style={{
+            color: isActive ? palette.solid : "#333",
+            fontSize: isMobile ? "12px" : "14px",
+            fontWeight: isActive ? "700" : "600",
+            textAlign: "center",
+            lineHeight: "1.2",
+            width: "100%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+          }}
+        >
+          {v.storeName || "Vendor Store"}
+        </span>
+
+        {/* Selected Indicator */}
+        {isActive && (
+          <span
+            className="vendor-store-selected"
+            style={{
+              position: "absolute",
+              top: "5px",
+              right: "5px",
+              width: "20px",
+              height: "20px",
+              borderRadius: "50%",
+              background: palette.solid,
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "12px",
+              fontWeight: "bold",
+            }}
+          >
+            ✓
+          </span>
+        )}
+      </button>
+    );
+  })}
+</div> 
                   </div>
                     
-                <button
+                {/* <button
                   type="button"
-                  onClick={() => scrollVendorTabs(1)}
+                  // onClick={() => scrollVendorTabs(1)}
                   aria-label="Scroll stores right"
                   style={{
                     flex: "0 0 auto",
@@ -4012,8 +4127,8 @@ const getVendorGradient = (name = "") => {
                     cursor: "pointer",
                   }}
                 >
-                 <ArrowForwardIcon style={{ fontSize: 16 }} />
-                </button>
+                 <ArrowForwardIcon style={{ fontSize: 16 }} /> 
+                </button> */}
               </div>
               {/* Selected Vendor Store Name */}
 {(() => {
@@ -4449,14 +4564,6 @@ const getVendorGradient = (name = "") => {
           )}
         </Modal.Body>
         <Modal.Footer>
-          {String(trackedOrder?.status || "").toLowerCase() === "in progress" && (
-            <Button
-              variant="success"
-              onClick={() => handleLiveDeliveryTracking(trackedOrder)}
-            >
-              Track delivery live
-            </Button>
-          )}
           {trackedOrder?.categories?.length ? (
             <Button
               variant="outline-primary"
@@ -4587,52 +4694,35 @@ const getVendorGradient = (name = "") => {
         </Modal.Footer>
       </Modal>
 
-      {pushSupported && !pushEnabled && !pushDismissed && userId && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="push-opt-in-title"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1600,
-            overflowY: "auto",
-            display: "grid",
-            placeItems: "center",
-            padding: 20,
-            background: "rgba(255,255,255,.98)",
-          }}
-        >
-          <section style={{ width: "100%", maxWidth: 500, textAlign: "left" }}>
-            <h2 id="push-opt-in-title" style={{ fontSize: 30, lineHeight: 1.2, fontWeight: 750, color: "#151515" }}>
-              Get updates on your order status
-            </h2>
-            <p style={{ marginTop: 18, color: "#676767", fontSize: 18, lineHeight: 1.4 }}>
-              Allow push notifications to get real-time updates on your order status.
-            </p>
-            <img
-              src={HandyManCharacter}
-              alt="Delivery partner carrying an order and notification bell"
-              style={{ display: "block", width: "min(78%, 310px)", height: 310, objectFit: "contain", margin: "24px auto" }}
+     {pushSupported && !pushEnabled && !pushDismissed && userId && (
+        <div className="push-notification-banner">
+          <div className="push-notification-banner-content">
+            <NotificationsActiveIcon
+              style={{ fontSize: 24, color: "#ff9800" }}
             />
+            <div style={{ flex: 1 }}>
+              <strong>Stay Updated!</strong>
+              <p style={{ margin: 0, fontSize: 13 }}>
+                Get instant alerts on orders, offers & more
+              </p>
+            </div>
             <button
-              type="button"
+              className="btn btn-sm btn-warning"
               onClick={handleEnablePush}
               disabled={pushLoading}
-              className="btn w-100"
-              style={{ minHeight: 66, borderRadius: 12, background: "#f4510b", color: "#fff", fontSize: 18, fontWeight: 700 }}
+              style={{ whiteSpace: "nowrap" }}
             >
-              {pushLoading ? "Enabling notifications…" : "Turn on Notification"}
+              {pushLoading ? "Enabling..." : "Enable"}
             </button>
             <button
-              type="button"
+              className="btn btn-sm btn-light ms-1"
               onClick={handleDismissPush}
-              className="btn btn-link w-100 mt-3"
-              style={{ color: "#d94b12", fontSize: 17, fontWeight: 650, textDecoration: "none" }}
+              style={{ padding: "2px 8px", fontSize: 16, lineHeight: 1 }}
+              title="Dismiss"
             >
-              Not Now
+              &times;
             </button>
-          </section>
+          </div>
         </div>
       )}
 

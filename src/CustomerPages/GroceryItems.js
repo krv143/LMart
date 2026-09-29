@@ -87,6 +87,14 @@ const GroceryCard = () => {
   const incomingStoreName = vendorData?.isVendorGrocery
     ? vendorData.storeName || "this store"
     : "LMart Products";
+  const normalizedStoreName = String(incomingStoreName || "")
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, "");
+
+const isPolamambaMarket =
+  normalizedStoreName === "polamambamarket" ||
+  normalizedStoreName === "polamanbamarket";
 
   const [storeReady, setStoreReady] = useState(null);
   const [conflictStore, setConflictStore] = useState(null);
@@ -680,12 +688,50 @@ const getLimit = (product) => {
                     <ArrowBackIcon
                       className="me-2"
                       style={{ color: "green", cursor: "pointer" }}
-                      onClick={() =>
-                        navigate(`/profilePage/${userType}/${userId}`)
-                      }
+                      onClick={() => {
+                        if (vendorData?.isVendorGrocery && vendorData.vendorId) {
+                          localStorage.setItem(
+                            "selectedVendorId",
+                            String(vendorData.vendorId)
+                          );
+
+                          navigate(`/profilePage/${userType}/${userId}`, {
+                            state: {
+                              selectedVendorId: String(vendorData.vendorId),
+                            },
+                          });
+                        } else {
+                          navigate(`/profilePage/${userType}/${userId}`);
+                        }
+                      }}
                     />
                     <h4 className="fw-bold mt-1">{selectedCategory}</h4>
                   </div>
+                  {isPolamambaMarket && (
+  <div
+    className="mt-2 rounded-3"
+   style={{
+                        backgroundColor: "#e3f2fd",
+                        color: "red",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        border: "1px solid #90caf9",
+                        fontFamily: "Roboto",
+                      }}
+  >
+    <div style={{ fontWeight: "700", marginBottom: "5px" }}>
+      🚚 Delivery Information
+    </div>
+      <strong>Delivery is only for Pincodes:  </strong>
+         530017, 530048, 530042, 530045.  <br/>
+
+      📝 <strong>Fishes Available Pre-Booking Before Day Only.</strong>  <br/>
+
+      🛍️ <strong>
+        Delivery Time next day Between 7:00 AM to 10:30 AM.
+      </strong>
+  </div>
+)}
                   {(selectedCategory === "Chicken" ||
                     selectedCategory === "Ice Creams") && (
                     <div
@@ -729,8 +775,11 @@ const getLimit = (product) => {
                 <div
                   className="d-flex justify-content-end"
                   style={{
-                    marginTop:
-                      selectedCategory === "Chicken" ? "230px" : "120px",
+                    marginTop: isPolamambaMarket
+                    ? "220px"
+                    : selectedCategory === "Chicken"
+                    ? "230px"
+                    : "120px",
                   }}
                 >
                   <span className="text-success text-xs">

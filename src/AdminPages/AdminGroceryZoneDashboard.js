@@ -40,6 +40,8 @@ const AdminGroceryZoneDashboard = () => {
 
   const [groceryList, setGroceryList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [vendorDetails, setVendorDetails] = useState({});
+const vendorCacheRef = useRef({});
   const [blinkingZones, setBlinkingZones] = useState({});
   const prevZoneCountsRef = useRef({});
 
@@ -47,13 +49,92 @@ const AdminGroceryZoneDashboard = () => {
     console.log(loading);
   }, [loading]);
 
+  const fetchVendorDetails = useCallback(async (vendorId) => {
+  if (!vendorId) return null;
+
+  // Return cached vendor details
+  if (vendorCacheRef.current[vendorId]) {
+    return vendorCacheRef.current[vendorId];
+  }
+
+  try {
+    const response = await fetch(
+      `https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/VendorRegistration/GetVendorDetailsByVendorId?vendorId=${encodeURIComponent(
+        vendorId
+      )}`
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Vendor API failed: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+
+    // Vendor API returns an array
+    const vendor = Array.isArray(data) ? data[0] : data;
+
+    if (vendor) {
+      const details = {
+        vendorId: vendor.vendorId,
+        vendorName: vendor.fullName || "",
+        mobileNumber: vendor.mobileNumber || "",
+        storeName: vendor.storeName || "",
+      };
+
+      // Save in cache
+      vendorCacheRef.current[vendorId] = details;
+
+      return details;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error fetching vendor details:", error);
+    return null;
+  }
+}, []);
+
   const fetchGroceryData = useCallback(async (isInitial = false) => {
     try {
       const res = await fetch(
         "https://lmartapiv1-fxcyd2b4btacgsav.westus2-01.azurewebsites.net/api/Mart/GetAllMartItems",
       );
       const data = await res.json();
+      // Get unique vendor IDs from Grocery API
+const uniqueVendorIds = [
+  ...new Set(
+    data
+      .map((item) => item.vendorId)
+      .filter(Boolean)
+  ),
+];
 
+// Fetch vendor details using vendorId
+const vendorResults = await Promise.all(
+  uniqueVendorIds.map(async (vendorId) => {
+    const details = await fetchVendorDetails(vendorId);
+    return {
+      vendorId,
+      details,
+    };
+  })
+);
+
+// Convert vendor results into object
+const vendorMap = {};
+
+vendorResults.forEach(({ vendorId, details }) => {
+  if (details) {
+    vendorMap[vendorId] = details;
+  }
+});
+
+setVendorDetails((prev) => ({
+  ...prev,
+  ...vendorMap,
+}));
       setGroceryList((prev) => {
         if (isInitial || prev.length === 0) {
           return data.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -89,6 +170,7 @@ const AdminGroceryZoneDashboard = () => {
     } finally {
       if (isInitial) setLoading(false);
     }
+    /* eslint-disable react-hooks/exhaustive-deps */
   }, []);
 
   // Initial load
@@ -175,6 +257,41 @@ const AdminGroceryZoneDashboard = () => {
     return zones;
   }, [groceryList, zoneMap]);
 
+  const vendorStoreCounts = useMemo(() => {
+  const stores = {};
+
+  groceryList.forEach((item) => {
+    const status = item.status?.toLowerCase().trim();
+
+    // Show only Open tickets
+    if (status !== "open") return;
+
+    const vendor = vendorDetails[item.vendorId];
+
+    const storeName = vendor?.storeName?.trim();
+
+    if (!storeName) return;
+
+    if (!stores[storeName]) {
+      stores[storeName] = {
+        count: 0,
+        tickets: [],
+      };
+    }
+
+    stores[storeName].tickets.push(item);
+    stores[storeName].count++;
+  });
+
+  Object.keys(stores).forEach((storeName) => {
+    stores[storeName].tickets.sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
+  });
+
+  return stores;
+}, [groceryList, vendorDetails]);
+
   useEffect(() => {
     const newBlinking = {};
     const prev = prevZoneCountsRef.current;
@@ -206,6 +323,13 @@ const AdminGroceryZoneDashboard = () => {
     navigate(`/adminGroceryOrderPage/${martId}`, { state: { martId } });
   };
 
+  const vendorStoreTabs = Object.keys(vendorStoreCounts);
+
+const allTabs = [
+  ...allZones,
+  ...vendorStoreTabs.map((storeName) => `VENDOR:${storeName}`),
+];
+
   return (
     <div style={{ padding: "20px" }}>
       <h2>
@@ -231,14 +355,24 @@ const AdminGroceryZoneDashboard = () => {
           marginBottom: "20px",
         }}
       >
-        {allZones.map((zone) => {
-          const data = zoneCounts[zone] || { count: 0 };
+        {allTabs.map((tab) => {
+          const isVendorStore = tab.startsWith("VENDOR:");
+
+          const storeName = isVendorStore
+            ? tab.replace("VENDOR:", "")
+            : null;
+
+          const data = isVendorStore
+            ? vendorStoreCounts[storeName] || { count: 0 }
+            : zoneCounts[tab] || { count: 0 };
+
           return (
             <div
-              key={zone}
-              onClick={() => setSelectedZone(zone)}
+              key={tab}
+              onClick={() => setSelectedZone(tab)}
               style={{
-                background: selectedZone === zone ? "#ffffff" : "#ffc107",
+                background:
+                  selectedZone === tab ? "#ffffff" : "#ffc107",
                 padding: "10px 20px",
                 borderRadius: "10px",
                 cursor: "pointer",
@@ -248,7 +382,8 @@ const AdminGroceryZoneDashboard = () => {
                 boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
               }}
             >
-              {zone}
+              {isVendorStore ? storeName : tab}
+
               <div
                 className="badge bg-danger"
                 style={{
@@ -256,7 +391,7 @@ const AdminGroceryZoneDashboard = () => {
                   borderRadius: "8px",
                   marginTop: "5px",
                   marginLeft: "5px",
-                  animation: blinkingZones?.[zone]
+                  animation: blinkingZones?.[tab]
                     ? "blink 1s infinite"
                     : "none",
                 }}
@@ -268,10 +403,21 @@ const AdminGroceryZoneDashboard = () => {
         })}
       </div>
 
-      {selectedZone && zoneCounts[selectedZone] && (
+      {selectedZone && (
         <div>
-          <h3 className="text-danger">Zone {selectedZone} Orders</h3>
-          {(zoneCounts[selectedZone]?.tickets || []).map((item) => (
+          <h3 className="text-danger">
+            {selectedZone.startsWith("VENDOR:")
+              ? `${selectedZone.replace("VENDOR:", "")} Tickets`
+              : `Zone ${selectedZone} Orders`}
+          </h3>
+
+          {(
+            selectedZone.startsWith("VENDOR:")
+              ? vendorStoreCounts[
+                  selectedZone.replace("VENDOR:", "")
+                ]?.tickets || []
+              : zoneCounts[selectedZone]?.tickets || []
+          ).map((item) => (
             <div
               key={item.martId}
               style={{
@@ -282,6 +428,7 @@ const AdminGroceryZoneDashboard = () => {
               }}
             >
               <strong>ID: </strong>
+
               <span
                 onClick={() => handleGroceryClick(item.id)}
                 style={{
@@ -292,43 +439,79 @@ const AdminGroceryZoneDashboard = () => {
               >
                 {item.martId}
               </span>
+
               <div>
                 <strong>Name:</strong> {item.customerName}
               </div>
+
               <div>
-                <strong>Address:</strong> {item.address}, {item.district},{" "}
-                {item.state}, {item.zipCode}, {item.customerPhoneNumber}
+                <strong>Address:</strong>{" "}
+                {item.address}, {item.district}, {item.state},{" "}
+                {item.zipCode}, {item.customerPhoneNumber}
               </div>
+
               <div>
                 <strong>Grand Total:</strong> Rs {item.grandTotal} /-
               </div>
+
               <div>
-                <strong>Date:</strong> {new Date(item.date).toLocaleString()}
+                <strong>Date:</strong>{" "}
+                {new Date(item.date).toLocaleString()}
               </div>
+
               <div>
-                <strong>Delivery Partner:</strong> {item.assignedTo}
+                <strong>Delivery Partner:</strong>{" "}
+                {item.assignedTo}
               </div>
+
+              <div>
+                <strong>Vendor Store Name:</strong>{" "}
+                {vendorDetails[item.vendorId]?.storeName ||
+                  "Loading..."}
+
+                {" | "}
+
+                <strong>Vendor Name:</strong>{" "}
+                {vendorDetails[item.vendorId]?.vendorName ||
+                  "Loading..."}
+
+                {" | "}
+
+                <strong>Mobile:</strong>{" "}
+                {vendorDetails[item.vendorId]?.mobileNumber ||
+                  "Loading..."}
+              </div>
+
               {item.status === "In Progress" && (
                 <div>
                   <strong>Delivery Assigned Time:</strong>{" "}
-                  {new Date(item.deliveryAssignedTime).toLocaleString("en-IN", {
+                  {new Date(
+                    item.deliveryAssignedTime
+                  ).toLocaleString("en-IN", {
                     timeZone: "Asia/Kolkata",
                   })}
                 </div>
               )}
+
               {item.status === "Delivered" && (
                 <div>
                   <strong>Delivery Submit Time:</strong>{" "}
-                  {new Date(item.deliverySubmitTime).toLocaleString("en-IN", {
+                  {new Date(
+                    item.deliverySubmitTime
+                  ).toLocaleString("en-IN", {
                     timeZone: "Asia/Kolkata",
                   })}
                 </div>
               )}
+
               <div>
-                <strong>Customer Paid Amount:</strong> Rs {item.paidAmount} /-
+                <strong>Customer Paid Amount:</strong>{" "}
+                Rs {item.paidAmount} /-
               </div>
+
               <div>
-                <strong>Payment Mode:</strong> {item.paymentMode}
+                <strong>Payment Mode:</strong>{" "}
+                {item.paymentMode}
               </div>
             </div>
           ))}

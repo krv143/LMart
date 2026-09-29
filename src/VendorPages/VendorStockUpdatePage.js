@@ -9,6 +9,7 @@ import Inventory2Icon from "@mui/icons-material/Inventory2";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import SearchIcon from "@mui/icons-material/Search";
+import DeleteIcon from "@mui/icons-material/Delete";
 import {
   getVendorProfileById,
   updateVendorProfile,
@@ -203,6 +204,7 @@ const [mrpInputText, setMrpInputText] = useState({});
   const [qtyInputText, setQtyInputText] = useState({}); 
 const originalValuesRef = useRef({}); 
 const addPhotoInputRef = useRef(null);
+const [selectedStockTab, setSelectedStockTab] = useState(null);
   const getPendingMrp = (item) =>
   Number(pendingMrp[item.id] ?? item.mrp ?? 0);
 
@@ -583,6 +585,22 @@ if (Object.keys(priceMap).length) setPendingPrice((prev) => ({ ...priceMap, ...p
     (sum, item) => sum + Number(item.stockLeft || 0),
     0,
   );
+
+// Stock = 0
+const outOfStockProducts = useMemo(() => {
+  return items.filter(
+    (item) => Number(item.stockLeft || 0) === 0
+  );
+}, [items]);
+
+// Stock greater than 0 and less than 5
+const lowStockProducts = useMemo(() => {
+  return items.filter((item) => {
+    const stock = Number(item.stockLeft || 0);
+    return stock > 0 && stock < 5;
+  });
+}, [items]);
+
   const dirtyIds = useMemo(
     () => Object.keys(pendingQty).filter((id) => Number(pendingQty[id]) > 0),
     [pendingQty],
@@ -1406,6 +1424,65 @@ const selectedForSubmissionCount = useMemo(
     return null;
   }
 
+  const handleDeleteProduct = (item) => {
+  const confirmed = window.confirm(
+    `Remove "${item.name}" from your selected products?`
+  );
+
+  if (!confirmed) return;
+
+  // Remove product from selection
+  setSelection((prev) => {
+    const next = { ...prev };
+    delete next[item.id];
+    return next;
+  });
+
+  // Clear quantity
+  setPendingQty((prev) => {
+    const next = { ...prev };
+    delete next[item.id];
+    return next;
+  });
+
+  // Clear limit
+  setPendingLimit((prev) => {
+    const next = { ...prev };
+    delete next[item.id];
+    return next;
+  });
+
+  // Clear MRP
+  setPendingMrp((prev) => {
+    const next = { ...prev };
+    delete next[item.id];
+    return next;
+  });
+
+  // Clear price
+  setPendingPrice((prev) => {
+    const next = { ...prev };
+    delete next[item.id];
+    return next;
+  });
+
+  // Clear input text states
+  setMrpInputText((prev) => {
+    const next = { ...prev };
+    delete next[item.id];
+    return next;
+  });
+
+  setQtyInputText((prev) => {
+    const next = { ...prev };
+    delete next[item.id];
+    return next;
+  });
+
+  setMessage(`"${item.name}" removed.`);
+  setTimeout(() => setMessage(""), 2500);
+};
+
   return (
     <div className="vsu-page" style={{ position: "relative" }}>
       <div className="container py-4">
@@ -1678,7 +1755,333 @@ const selectedForSubmissionCount = useMemo(
             </div>
           </div>
         </div>
+          
+           <div className="mb-2">
+            <div
+              className="d-flex gap-3"
+              style={{
+                width: "100%",
+                flexWrap: "wrap",
+              }}
+            >
+              {/* OUT OF STOCK TAB */}
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedStockTab(
+                    selectedStockTab === "outOfStock"
+                      ? null
+                      : "outOfStock"
+                  )
+                }
+                style={{
+                  flex: "1 1 0",
+                  minWidth: "220px",
+                  border:
+                    selectedStockTab === "outOfStock"
+                      ? "2px solid #dc3545"
+                      : "1px solid #dc3545",
+                  background:
+                    selectedStockTab === "outOfStock"
+                      ? "#fff1f1"
+                      : "#ffffff",
+                  borderRadius: "14px",
+                  padding: "14px",
+                  cursor: "pointer",
+                  boxShadow: "0 3px 5px rgba(0,0,0,0.08)",
+                  textAlign: "left",
+                }}
+              >
+                <div className="d-flex align-items-center justify-content-between">
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#dc3545",
+                      }}
+                    >
+                      Out of Stock -- <strong>Products with stock 0</strong>
+                    </div>
+                  </div>
 
+                  <span
+                    className="badge bg-danger"
+                    style={{
+                      fontSize: "14px",
+                      borderRadius: "10px",
+                      padding: "8px",
+                    }}
+                  >
+                    {outOfStockProducts.length}
+                  </span>
+                </div>
+              </button>
+
+              {/* LOW STOCK TAB */}
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedStockTab(
+                    selectedStockTab === "lowStock"
+                      ? null
+                      : "lowStock"
+                  )
+                }
+                style={{
+                  flex: "1 1 0",
+                  minWidth: "220px",
+                  border:
+                    selectedStockTab === "lowStock"
+                      ? "2px solid #f0ad4e"
+                      : "1px solid #f0ad4e",
+                  background:
+                    selectedStockTab === "lowStock"
+                      ? "#fff9ed"
+                      : "#ffffff",
+                  borderRadius: "14px",
+                  padding: "14px 18px",
+                  cursor: "pointer",
+                  boxShadow: "0 3px 5px rgba(0,0,0,0.08)",
+                  textAlign: "left",
+                }}
+              >
+                <div className="d-flex align-items-center justify-content-between">
+                  <div>
+                    <div
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#d88900",
+                      }}
+                    >
+                      Low Stock -- <strong>Products with stock less than 5</strong>
+                    </div>
+
+                    {/* <div
+                      style={{
+                        fontSize: "11px",
+                        color: "#000",
+                        marginTop: "2px",
+                      }}
+                    >
+                      Products with stock less than 5
+                    </div> */}
+                  </div>
+
+                  <span
+                    className="badge"
+                    style={{
+                      background: "#f0ad4e",
+                      color: "#fff",
+                      fontSize: "14px",
+                      borderRadius: "10px",
+                      padding: "8px",
+                    }}
+                  >
+                    {lowStockProducts.length}
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+         {selectedStockTab && (
+            <div
+              className="mb-2"
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "18px",
+                boxShadow: "0 3px 12px rgba(0,0,0,0.08)",
+                border: "1px solid #000",
+              }}
+            >
+              <div className="d-flex justify-content-between align-items-center">
+                <div>
+                  <h4
+                    className="mb-1"
+                    style={{
+                      fontWeight: 700,
+                      color:
+                        selectedStockTab === "outOfStock"
+                          ? "#dc3545"
+                          : "#d88900",
+                    }}
+                  >
+                    {selectedStockTab === "outOfStock"
+                      ? "Out of Stock Products"
+                      : "Low Stock Products"}
+                  </h4>
+
+                  <small className="text-muted">
+                    {selectedStockTab === "outOfStock"
+                      ? "Products that currently have 0 stock"
+                      : "Products that currently have 1 to 4 stock"}
+                  </small>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-danger"
+                  onClick={() => setSelectedStockTab(null)}
+                >
+                  X
+                </button>
+              </div>
+
+              {(
+                selectedStockTab === "outOfStock"
+                  ? outOfStockProducts
+                  : lowStockProducts
+              ).length === 0 ? (
+                <div
+                  className="text-center p-4"
+                  style={{
+                    background: "#f8f9fa",
+                    borderRadius: "10px",
+                  }}
+                >
+                  <strong>
+                    {selectedStockTab === "outOfStock"
+                      ? "No out-of-stock products."
+                      : "No low-stock products."}
+                  </strong>
+                </div>
+              ) : (
+                <div className="row g-3">
+                  {(
+                    selectedStockTab === "outOfStock"
+                      ? outOfStockProducts
+                      : lowStockProducts
+                  ).map((item) => {
+                    const liveStock = Number(item.stockLeft || 0);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="col-6 col-md-4 col-lg-3 col-xl-2"
+                      >
+                        <div
+                          style={{
+                            border: "1px solid #ddd",
+                            borderRadius: "12px",
+                            padding: "10px",
+                            height: "100%",
+                            background: "#fff",
+                            position: "relative",
+                          }}
+                        >
+                          {/* Stock badge */}
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: "7px",
+                              right: "7px",
+                              zIndex: 2,
+                              background:
+                                liveStock === 0
+                                  ? "#dc3545"
+                                  : "#f0ad4e",
+                              color: "#fff",
+                              fontSize: "10px",
+                              fontWeight: 700,
+                              padding: "4px 7px",
+                              borderRadius: "8px",
+                            }}
+                          >
+                            Stock: {liveStock}
+                          </span>
+
+                          {/* Product image */}
+                          <div
+                            className="d-flex justify-content-center align-items-center"
+                            style={{
+                              height: "90px",
+                              marginBottom: "8px",
+                            }}
+                          >
+                            <img
+                              src={getProductImage(item)}
+                              alt={item.name}
+                              loading="lazy"
+                              decoding="async"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null;
+                                e.currentTarget.src = makePlaceholder(
+                                  item.name,
+                                  "adb5bd",
+                                  "ffffff"
+                                );
+                              }}
+                              style={{
+                                maxHeight: "80px",
+                                maxWidth: "100%",
+                                objectFit: "contain",
+                                borderRadius: "6px",
+                                backgroundColor: "#f5f5f5",
+                              }}
+                            />
+                          </div>
+
+                          {/* Product name */}
+                          <div
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              lineHeight: "1.3",
+                              minHeight: "32px",
+                            }}
+                          >
+                            {item.name}
+                          </div>
+
+                          {/* Product code */}
+                          <div
+                            className="text-muted"
+                            style={{
+                              fontSize: "10px",
+                              // marginTop: "3px",
+                            }}
+                          >
+                            {item.code}
+                          </div>
+
+                          {/* Category */}
+                          <div
+                            style={{
+                              fontSize: "10px",
+                              color: "#666",
+                              // marginTop: "3px",
+                            }}
+                          >
+                            {item.category || "Unspecified"}
+                          </div>
+
+                          {/* Stock status */}
+                          {/* <div
+                            className="mt-2"
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 700,
+                              color:
+                                liveStock === 0
+                                  ? "#dc3545"
+                                  : "#d88900",
+                            }}
+                          >
+                            {liveStock === 0
+                              ? "OUT OF STOCK"
+                              : `LOW STOCK - ${liveStock} LEFT`}
+                          </div> */}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         {message && (
           <div className="alert alert-success rounded-4 border-0 shadow-sm">
             {message}
@@ -2017,7 +2420,32 @@ const selectedForSubmissionCount = useMemo(
                           onChange={() => toggleSelectForSubmission(item)}
                         />
                       </label>
-
+                        <button
+                        type="button"
+                        onClick={() => handleDeleteProduct(item)}
+                        title={`Delete ${item.name}`}
+                        aria-label={`Delete ${item.name}`}
+                        style={{
+                          position: "absolute",
+                          top: "6px",
+                          right: "6px",
+                          zIndex: 5,
+                          width: "30px",
+                          height: "30px",
+                          border: "none",
+                          borderRadius: "50%",
+                          background: "#e63946",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+                          padding: 0,
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </button>
                       <div
                         className="d-flex justify-content-center align-items-center position-relative"
                         style={{ height: "90px" }}
