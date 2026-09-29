@@ -35,16 +35,30 @@ import React, { useEffect, useState } from "react";
  */
 
 let listeners = [];
-let state = { open: false, type: "alert", message: "", resolve: null };
+let state = {
+  open: false,
+  type: "alert",
+  message: "",
+  resolve: null,
+  okText: undefined,
+  cancelText: undefined,
+};
 
 function setState(next) {
   state = { ...state, ...next };
   listeners.forEach((l) => l(state));
 }
 
-function openDialog(type, message) {
+function openDialog(type, message, options = {}) {
   return new Promise((resolve) => {
-    setState({ open: true, type, message, resolve });
+    setState({
+      open: true,
+      type,
+      message,
+      resolve,
+      okText: options.okText,
+      cancelText: options.cancelText,
+    });
   });
 }
 
@@ -52,8 +66,10 @@ export function alertDialog(message) {
   return openDialog("alert", message);
 }
 
-export function confirmDialog(message) {
-  return openDialog("confirm", message);
+// options (optional): { okText, cancelText } to relabel the buttons,
+// e.g. confirmDialog("Location is off", { okText: "Try again" }).
+export function confirmDialog(message, options) {
+  return openDialog("confirm", message, options);
 }
 
 // Auto-fix every existing alert("...") call in the app, with zero
@@ -135,7 +151,7 @@ export function DialogHost() {
                 cursor: "pointer",
               }}
             >
-              Cancel
+              {dialogState.cancelText || "Cancel"}
             </button>
           )}
           <button
@@ -150,7 +166,7 @@ export function DialogHost() {
               cursor: "pointer",
             }}
           >
-            OK
+            {dialogState.okText || "OK"}
           </button>
         </div>
       </div>

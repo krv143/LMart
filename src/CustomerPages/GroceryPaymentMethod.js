@@ -10,6 +10,7 @@ import Footer from "../CommonPages/Footer.js";
 import { getLocalCashbackOffers } from "../utils/localCashbackOffers";
 import { CartStorage } from "../CommonPages/CartStorage";
 import { invalidateVendorProductsCache } from "../utils/vendorListStore";
+import { getLocationWithRetry } from "../utils/getLocation";
 // import { appConfig } from "./config";
   
 const GET_VENDOR_PRODUCTS_URL =
@@ -837,7 +838,7 @@ const primary = addresses.find((addr) => addr.type === "primary");
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const handleUpdateMartOrder = async () => {
+  const handleUpdateMartOrder = async (location) => {
     const primaryAddress = addresses.find((addr) => addr.type === "primary");
     const state = primaryAddress?.state;
     const district = primaryAddress?.district || "";
@@ -846,7 +847,6 @@ const primary = addresses.find((addr) => addr.type === "primary");
     const existingWallet = Number(offerWalletAmount || 0);
     const walletAfterUsage = existingWallet - walletToUse;
     const updatedWalletAmount = walletAfterUsage + cashback;
-    // const location = await getUserLocation();
     const payload = {
       ...cartData,
       customerName: addressData.fullName || fullName,
@@ -870,8 +870,8 @@ const primary = addresses.find((addr) => addr.type === "primary");
       paidAmount: "",
       AssignedTo: "",
       DeliveryPartnerUserId: "",
-      latitude: 0,
-      longitude: 0,
+      latitude: location?.latitude ?? 0,
+      longitude: location?.longitude ?? 0,
       isPickUp: false,
       isDelivered: false,
       totalWalletAmount: String(updatedWalletAmount),
@@ -938,9 +938,9 @@ const primary = addresses.find((addr) => addr.type === "primary");
     console.log("✅ Offers transaction updated successfully");
   };
 
-  const handleUpdatePaymentMethod = async () => {
+  const handleUpdatePaymentMethod = async (location) => {
     try {
-      const updatedWalletAmount = await handleUpdateMartOrder();
+      const updatedWalletAmount = await handleUpdateMartOrder(location);
       await handleUpdateOffersTransaction(updatedWalletAmount);
       localStorage.removeItem(`cartSnapshot_${groceryItemId}`);
       localStorage.removeItem("activeOrderId");
@@ -1227,11 +1227,25 @@ const primary = addresses.find((addr) => addr.type === "primary");
   const handlePaymentAndSms = async () => {
     try {
       setLoading(true);
+
+      // Location is optional. We ask the customer ONE time to turn it on
+      // (Try again / Skip). Either way the order is placed; if we never get a
+      // location, latitude/longitude stay 0 as before.
+      let location = null;
+      try {
+        location = await getLocationWithRetry({
+          maxAttempts: 2, // first try + the single "please turn it on" retry
+          geoOptions: { maximumAge: 0 },
+        });
+      } catch (locationError) {
+        console.warn("📍 Continuing without location:", locationError);
+      }
+
       await Promise.all([
         handleUpdateStockLeft(),
         handleUpdateVendorProductQuantities(),
         sendLmartsms(),
-        handleUpdatePaymentMethod(),
+        handleUpdatePaymentMethod(location),
       ]);
     } catch (error) {
       console.error(error);
