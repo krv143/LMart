@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import "./App.css";
 import DialogHost from "./CommonPages/DialogSystem";
+import UpdateAppPrompt from "./components/UpdateAppPrompt";
 import {
   useNavigate,
   useLocation,
@@ -102,6 +103,7 @@ function App() {
     <Router>
       <PreventBackNavigation />
       <DialogHost />
+      <UpdateAppPrompt />
       <div className="App">
         <main>
           {/* className="mt-100" */}
